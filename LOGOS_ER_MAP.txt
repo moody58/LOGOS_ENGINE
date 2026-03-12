@@ -1,0 +1,64 @@
+
+========================================================
+LOGOS — ENTITY RELATIONSHIP MAP
+========================================================
+
+                 +------------------+
+                 |     PROJECTS     |
+                 |------------------|
+                 | Project_ID (PK)  |
+                 | Project_Name     |
+                 | Parent_ProjectID |
+                 +--------+---------+
+                          |
+                          |
+                          v
+                +------------------+
+                |     RAW_DATA     |
+                |------------------|
+                | ID_Movimento PK  |
+                | Timestamp        |
+                | Data_Evento      |
+                | Soggetto_Input   |
+                | Project_ID  FK   |
+                | Entity_ID   FK   |
+                | Tipo_Movimento   |
+                | Valore           |
+                +--------+---------+
+                         |
+                         |
+                         v
+                 +------------------+
+                 |     ENTITIES     |
+                 |------------------|
+                 | Entity_ID (PK)   |
+                 | Entity_Type      |
+                 | Display_Name     |
+                 | Parent_Entity_ID |
+                 +--------+---------+
+                          |
+                          |
+                          v
+               +-----------------------+
+               |  ENTITY_CONFIRMATION  |
+               |-----------------------|
+               | Input_Text            |
+               | Suggested_Entity_ID   |
+               | Confirmed_Entity_ID   |
+               | Status                |
+               +-----------------------+
+
+RAW_DATA → alimenta dataset analitici:
+
+CONTROLLO_PROJECT
+CONTROLLO_PROJECT_DETTAGLIO
+CONTROLLO_ENTITY
+CONTROLLO_ENTITY_DETTAGLIO
+
+Questi dataset alimentano:
+
+DASHBOARD
+REPORT
+ANALISI OPERATIVE
+
+========================================================

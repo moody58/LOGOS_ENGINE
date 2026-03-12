@@ -1,0 +1,711 @@
+========================================================
+AIOS / LOGOS ENGINE
+CHECKPOINT COMPLETO DEL SISTEMA
+Versione checkpoint: 1.0
+Lingua: Italiano
+Tipo documento: Snapshot operativo integrale
+========================================================
+
+
+
+========================================================
+1 — POSIZIONE DEL SISTEMA
+========================================================
+
+AIOS è il metasistema metodologico.
+
+LOGOS è il motore dati operativo.
+
+Struttura ecosistema:
+
+AIOS
+↓
+LOGOS ENGINE
+↓
+ISTANZE PROGETTO
+
+Esempi:
+
+LOGOS_ADEXIMA
+LOGOS_ASPRI
+LOGOS_MAURIZIOLAB
+
+
+
+Ruolo AIOS
+
+• definisce metodo
+• governa i progetti
+• definisce protocolli
+
+
+Ruolo LOGOS
+
+• registra eventi
+• gestisce database operativo
+• genera dataset analitici
+• alimenta dashboard
+
+
+
+
+========================================================
+2 — PRINCIPI ARCHITETTURALI
+========================================================
+
+LOGOS è progettato come sistema EVENT DRIVEN.
+
+Il sistema registra eventi e non stati.
+
+
+
+Esempio evento
+
+2 ore lavoro progetto Adexima
+
+
+
+Esempio stato
+
+Totale ore progetto
+
+
+
+Gli stati vengono ricostruiti tramite aggregazioni.
+
+
+
+--------------------------------------------------------
+
+
+APPEND ONLY LEDGER
+
+Il registro eventi non viene modificato.
+
+Le correzioni avvengono tramite nuovi eventi.
+
+
+
+Benefici
+
+• audit completo
+• storico immutabile
+• ricostruzione temporale
+
+
+
+
+--------------------------------------------------------
+
+
+SEPARAZIONE METODO / DATI
+
+AIOS governa il metodo.
+
+LOGOS gestisce dati operativi.
+
+
+
+
+
+
+========================================================
+3 — PIPELINE DATI UNIVERSALE
+========================================================
+
+Pipeline logica del sistema:
+
+
+INPUT
+↓
+STAGING
+↓
+PROCESSING
+↓
+EVENT STORE
+↓
+DATASET
+↓
+METRICHE
+↓
+DASHBOARD
+
+
+
+Implementazione reale
+
+
+INPUT
+
+Google Form
+Siri
+API
+
+
+↓
+
+
+RAW_INPUT
+(staging)
+
+
+↓
+
+
+LOGOS_PROCESSOR
+(script Apps Script)
+
+
+↓
+
+
+RAW_DATA
+(registro eventi)
+
+
+↓
+
+
+CONTROLLO_*
+(dataset analitici)
+
+
+↓
+
+
+Dashboard
+
+
+
+
+========================================================
+4 — STRUTTURA DATABASE LOGOS
+========================================================
+
+Il database è diviso in quattro livelli.
+
+
+
+CONFIGURAZIONE
+
+SETTINGS
+
+
+
+ENTITÀ OPERATIVE
+
+PROJECTS
+ENTITIES
+
+
+
+REGISTRO EVENTI
+
+RAW_INPUT
+RAW_DATA
+
+
+
+DATASET ANALITICI
+
+CONTROLLO_PROJECT
+CONTROLLO_PROJECT_DETTAGLIO
+CONTROLLO_ENTITY
+CONTROLLO_ENTITY_DETTAGLIO
+
+
+
+
+========================================================
+5 — TABELLA SETTINGS
+========================================================
+
+Funzione
+
+registro configurazione sistema.
+
+
+
+Struttura reale
+
+
+Setting_Type
+Value
+Description
+(blank column)
+
+Project_Type_List
+Status_List
+Entity_Type_List
+Entity_Status_List
+Entity_ID_List
+
+
+
+Flusso
+
+
+SETTINGS
+↓
+FILTER
+↓
+liste dropdown
+↓
+validazione campi database
+
+
+
+
+
+========================================================
+6 — TABELLA PROJECTS
+========================================================
+
+Campi
+
+
+Project_ID
+Project_Name
+Parent_Project_ID
+Project_Type
+Status
+Start_Date
+End_Date
+Created_Timestamp
+Notes
+
+
+
+Vincoli
+
+
+Project_ID chiave primaria.
+
+Parent_Project_ID non può essere uguale a Project_ID.
+
+
+
+Relazioni
+
+
+PROJECTS.Project_ID
+↓
+RAW_DATA.Project_ID
+
+
+
+
+
+========================================================
+7 — TABELLA ENTITIES
+========================================================
+
+Campi
+
+
+Entity_ID
+Entity_Type
+First_Name
+Last_Name
+Company_Name
+Display_Name
+Phone
+Email
+Country
+City
+Address
+Geo_Location
+Status
+Parent_Entity_ID
+Created_Timestamp
+Modified_Timestamp
+Source
+Notes
+
+
+
+Logica Display_Name
+
+
+se Company_Name esiste
+→ Company_Name
+
+altrimenti
+→ First_Name + Last_Name
+
+
+
+Relazione
+
+
+ENTITIES.Entity_ID
+↓
+RAW_DATA.Entity_ID
+
+
+
+
+
+========================================================
+8 — TABELLA RAW_INPUT
+========================================================
+
+Funzione
+
+layer di ingestione dati.
+
+
+
+Fonti input
+
+Google Form
+Siri
+API
+input manuale
+
+
+
+Campi
+
+
+Timestamp_Form
+Project_Name
+Tipo_Movimento
+Valore
+Data_Evento
+Causale
+Riferimento_ID
+Metodo_Pagamento
+Note
+Soggetto
+
+
+
+Campi previsti versione futura
+
+
+PROCESS_STATUS
+ERROR_MESSAGE
+SOURCE
+
+
+
+
+
+========================================================
+9 — TABELLA RAW_DATA
+========================================================
+
+Registro eventi principale.
+
+
+
+Schema
+
+
+ID_Movimento
+Timestamp
+Data_Evento
+Soggetto_Input
+Project_ID
+Entity_ID
+Tipo_Movimento
+Valore
+Unita
+Causale
+Categoria_Derivata
+Riferimento_ID
+Fonte
+Metodo_Pagamento
+Note
+
+
+
+
+========================================================
+10 — CLASSIFICAZIONE EVENTI
+========================================================
+
+Tipo movimento
+
+
+Tempo
+Spesa
+Incasso
+Evento
+
+
+
+
+Unità derivate
+
+
+Tempo → h
+Spesa → €
+Incasso → €
+Evento → Evento
+
+
+
+
+Formula unità
+
+
+ARRAYFORMULA(
+IF(G2:G="";
+"";
+IF(G2:G="Tempo";"h";
+IF(G2:G="Spesa";"€";
+IF(G2:G="Incasso";"€";
+IF(G2:G="Evento";"Evento";"")))))
+)
+
+
+
+
+Categoria derivata
+
+
+Tempo → Operativa
+Spesa → Economica_Uscita
+Incasso → Economica_Entrata
+Evento → Informativa
+
+
+
+Formula categoria
+
+
+ARRAYFORMULA(
+IF(G2:G="";
+"";
+IF(G2:G="Tempo";"Operativa";
+IF(G2:G="Spesa";"Economica_Uscita";
+IF(G2:G="Incasso";"Economica_Entrata";
+IF(G2:G="Evento";"Informativa";"")))))
+)
+
+
+
+
+========================================================
+11 — DATASET CONTROLLO_PROJECT
+========================================================
+
+Aggregazione per progetto.
+
+
+
+Formula Ore_Diretto
+
+
+ARRAYFORMULA(
+MAP(
+A2:A200;
+LAMBDA(id;
+IF(id="";
+"";
+SUMIFS(
+RAW_DATA!H2:H2000;
+RAW_DATA!E2:E2000;id;
+RAW_DATA!G2:G2000;"Tempo"
+)
+)
+)
+)
+
+
+
+
+Ore_Figli
+
+
+ARRAYFORMULA(
+IF(A2:A500="";
+"";
+MAP(A2:A500;
+LAMBDA(id;
+SUMIF(CONTROLLO_PROJECT_DETTAGLIO!A2:A2000;id;CONTROLLO_PROJECT_DETTAGLIO!D2:D2000)
+)
+)
+)
+)
+
+
+
+Ore_Complessive
+
+
+ARRAYFORMULA(
+IF(A2:A500="";
+"";
+E2:E500 + J2:J500
+)
+)
+
+
+
+
+
+========================================================
+12 — DATASET CONTROLLO_PROJECT_DETTAGLIO
+========================================================
+
+Formula Ore
+
+
+ARRAYFORMULA(
+IF(B2:B="";
+"";
+MAP(B2:B;
+LAMBDA(figlio;
+SUMIFS(RAW_DATA!H:H;
+RAW_DATA!E:E;figlio;
+RAW_DATA!G:G;"Tempo")
+)
+)
+)
+
+
+
+
+
+========================================================
+13 — ENTITY_CONFIRMATION
+========================================================
+
+Formula Suggested_Entity
+
+
+ARRAYFORMULA(
+IF(A2:A="";
+"";
+IFERROR(
+VLOOKUP(
+LOWER(A2:A);
+{LOWER(ENTITIES!C2:C)\ENTITIES!C2:C};
+2;
+FALSE
+);
+""
+)
+)
+)
+
+
+
+
+
+========================================================
+14 — SCRIPT APPS SCRIPT
+========================================================
+
+Script principale
+
+onEdit(e)
+
+
+
+Funzioni
+
+• generazione ID movimento
+• generazione Project_ID
+• generazione Entity_ID
+• protezione chiavi primarie
+• blocco auto-parent
+• system log
+
+
+
+Script kernel
+
+0607_LOGOS_APPS_SCRIPT_KERNEL_v1.3
+
+
+
+
+
+========================================================
+15 — MONITORING
+========================================================
+
+Foglio
+
+SYSTEM_LOG
+
+
+
+Registra
+
+• eventi sistema
+• creazione progetti
+• creazione entità
+• errori
+
+
+
+
+========================================================
+16 — STATO IMPLEMENTAZIONE
+========================================================
+
+Implementato
+
+Event Ledger RAW_DATA
+Dimension tables
+Dataset analitici
+Script integrità
+Monitoring
+
+
+
+Parzialmente implementato
+
+RAW_INPUT staging
+ENTITY_CONFIRMATION
+
+
+
+Non implementato
+
+processor pipeline completa
+lifecycle eventi
+entity similarity match
+
+
+
+
+
+========================================================
+17 — NODO OPERATIVO ATTUALE
+========================================================
+
+LOGOS_INPUT_SYSTEM
+
+
+
+Obiettivo
+
+implementare pipeline ingestione eventi.
+
+
+
+
+Pipeline target
+
+
+INPUT
+↓
+RAW_INPUT
+↓
+LOGOS_PROCESSOR
+↓
+RAW_DATA
+
+
+
+
+
+========================================================
+END CHECKPOINT
+========================================================
