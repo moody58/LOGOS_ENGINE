@@ -1,0 +1,19 @@
+name: Enforce filename policy
+
+on: [push]
+
+jobs:
+  check-filenames:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Block versioned filenames
+        run: |
+          if git ls-files | grep "_v[0-9]\+\.[0-9]\+"; then
+            echo "ERROR: version numbers in filenames are not allowed."
+            exit 1
+          else
+            echo "Filename policy OK."
+          fi
