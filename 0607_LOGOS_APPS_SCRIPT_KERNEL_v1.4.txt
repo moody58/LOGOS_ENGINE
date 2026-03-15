@@ -1,6 +1,6 @@
 /****************************************************
 LOGOS — Apps Script Kernel
-File: 0607_LOGOS_APPS_SCRIPT_KERNEL_v1.3.gs
+File: 0607_LOGOS_APPS_SCRIPT_KERNEL_v1.4.gs
 System: LOGOS Engine
 Ecosystem: AIOS
 ****************************************************/
@@ -27,6 +27,29 @@ function logEvent(eventType, sheetName, row, details) {
 }
 
 
+/* =====================================================
+GLOBAL MOVEMENT ID GENERATOR
+===================================================== */
+
+function LOGOS_generateMovementID() {
+
+  const props = PropertiesService.getDocumentProperties();
+
+  let lastNumber = parseInt(props.getProperty("LAST_MOV_NUMBER")) || 0;
+
+  const nextNumber = lastNumber + 1;
+
+  props.setProperty("LAST_MOV_NUMBER", nextNumber);
+
+  return "MOV_" + String(nextNumber).padStart(6,"0");
+
+}
+
+
+
+/* =====================================================
+ON EDIT KERNEL
+===================================================== */
 
 function onEdit(e) {
 
@@ -81,55 +104,13 @@ PROTEZIONE CHIAVI PRIMARIE
 
 
 /* =====================================================
-RAW_DATA — CREAZIONE MOVIMENTO
+ENTITY CONFIRMATION
 ===================================================== */
 
   if (sheetName === "RAW_DATA") {
 
-    const idColumn = 1;
-    const timestampColumn = 2;
-    const projectColumn = 5;
     const entityInputColumn = 4;
     const entityIdColumn = 6;
-
-    const idCell = sheet.getRange(row, idColumn);
-    const timestampCell = sheet.getRange(row, timestampColumn);
-
-
-
-/* ---- Generazione ID movimento ---- */
-
-    if (col === projectColumn && e.value) {
-
-      if (!timestampCell.getValue()) {
-
-        let lastNumber = parseInt(props.getProperty("LAST_MOV_NUMBER")) || 0;
-
-        const nextNumber = lastNumber + 1;
-
-        props.setProperty("LAST_MOV_NUMBER", nextNumber);
-
-        const newId = "MOV_" + String(nextNumber).padStart(6, "0");
-
-        timestampCell.setValue(new Date());
-        idCell.setValue(newId);
-
-        logEvent(
-          "NEW_MOVEMENT",
-          sheetName,
-          row,
-          "Creato " + newId
-        );
-
-      }
-
-    }
-
-
-
-/* =====================================================
-ENTITY CONFIRMATION
-===================================================== */
 
     const entityInput = sheet.getRange(row, entityInputColumn).getValue();
     const entityId = sheet.getRange(row, entityIdColumn).getValue();
@@ -152,13 +133,13 @@ ENTITY CONFIRMATION
       if (!exists) {
 
         confirmSheet.appendRow([
-          entityInput,   
-          "",            
-          "",            
-          "",            
-          "",            
-          new Date(),    
-          "PENDING"      
+          entityInput,
+          "",
+          "",
+          "",
+          "",
+          new Date(),
+          "PENDING"
         ]);
 
         logEvent(
@@ -342,5 +323,45 @@ ENTITIES — CREAZIONE ENTITÀ
     }
 
   }
+
+}
+
+
+
+/* =====================================================
+PERFORMANCE MONITOR
+===================================================== */
+
+function LOGOS_performanceMonitor() {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settings = ss.getSheetByName("SETTINGS");
+
+  const value = settings.getRange("J2").getValue();
+
+  if (value === "ON") {
+    return true;
+  } else {
+    return false;
+  }
+
+}
+
+
+function LOGOS_logPerformance(eventName, startTime) {
+
+  if (!LOGOS_performanceMonitor()) return;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const log = ss.getSheetByName("SYSTEM_LOG");
+
+  const endTime = new Date().getTime();
+  const duration = (endTime - startTime) / 1000;
+
+  log.appendRow([
+    new Date(),
+    eventName,
+    duration
+  ]);
 
 }
