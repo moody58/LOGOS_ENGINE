@@ -1044,90 +1044,85 @@ logEvent()
 
 
 ------------------------------------------------
-OPEN ARCHITECTURE NODES
+ARCHITECTURE DECISIONS
 ------------------------------------------------
-
 
 NODE 1 — Movement ID Generation
 
 Status:
-OPEN
+RESOLVED
 
-Descrizione:
+Decisione architetturale:
 
-La generazione dell'ID dei movimenti del ledger
-è attualmente gestita in due punti potenziali
-del sistema.
+La generazione degli ID dei movimenti del ledger
+è gestita dal Processor durante la scrittura
+degli eventi nel ledger RAW_DATA.
 
-Possibili implementazioni:
-
-A)
-
-Kernel.gs
-
-Generazione ID durante onEdit
-quando viene compilato Project_ID.
-
-B)
-
-Processor.gs
-
-Generazione ID durante scrittura
-buffer eventi verso RAW_DATA.
-
-Funzione individuata nel processor:
+Funzione responsabile:
 
 LOGOS_generateMovementID()
 
-Decisione architetturale finale:
+Implementazione:
 
-DA DEFINIRE
+Processor.gs
 
+Motivazione:
 
+Il Processor rappresenta l'autorità di scrittura
+del ledger e garantisce la generazione coerente
+degli ID durante l'ingestione eventi.
 
-------------------------------------------------
+Il Kernel può generare ID solo nel caso di
+inserimenti manuali diretti nel ledger tramite
+interfaccia Google Sheets, come fallback di
+sicurezza durante operazioni manuali.
 
+Autorità primaria:
+
+Processor
+
+Fallback:
+
+Kernel
+
+---
 
 NODE 2 — Entity Resolution Matching Field
 
 Status:
-OPEN
+RESOLVED
 
-Descrizione:
+Decisione architetturale:
 
-Il processor costruisce una mappa delle entità
-per risolvere automaticamente il soggetto
-inserito negli eventi.
+La risoluzione automatica delle entità utilizza
+due campi del modello ENTITIES.
 
-Implementazione attuale:
+Campi utilizzati per il matching:
+
+First_Name
+Display_Name
+
+Implementazione:
 
 buildEntityMap()
 
-Codice:
-
-map[entities[i][2]] = entities[i][0];
-
-Questo significa che il matching avviene
-sulla colonna:
-
-ENTITIES column index 2
-
-Attualmente corrisponde a:
+Matching effettuato su:
 
 First_Name
-
-Possibile campo alternativo:
-
 Display_Name
 
-Decisione architetturale finale:
+Motivazione:
 
-DA DEFINIRE
+Il campo Display_Name rappresenta la forma
+normalizzata dell'entità (persona o azienda)
+mentre First_Name consente compatibilità con
+inserimenti rapidi manuali.
 
+Questo approccio permette una risoluzione
+robusta senza richiedere inserimento rigido
+del nome completo.
 
-
-------------------------------------------------
-
+---
 
 NODE 3 — Analytics Range Policy
 
@@ -1143,26 +1138,20 @@ Esempio:
 
 RAW_DATA!H2:H1002
 
-invece di
-
-RAW_DATA!H:H
-
 Motivazione:
 
-performance di SUMIFS in MAP + LAMBDA.
+performance delle funzioni MAP + LAMBDA
+in Google Sheets.
 
 Decisione futura:
 
-valutare migrazione a
+valutare:
 
 range dinamici
 oppure
 table expansion logic.
 
-
-
-------------------------------------------------
-
+---
 
 NODE 4 — Range Inconsistency Analytics
 
@@ -1172,7 +1161,7 @@ KNOWN ISSUE
 Descrizione:
 
 Alcune formule analytics utilizzano
-limiti di range differenti.
+range differenti.
 
 Esempi:
 
@@ -1189,10 +1178,7 @@ Decisione futura:
 
 uniformare i range analytics.
 
-
-
-------------------------------------------------
-
+---
 
 NODE 5 — Google Sheets System Requirement
 
@@ -1205,8 +1191,7 @@ Il sistema utilizza la funzione NOW()
 nella tabella ENTITY_CONFIRMATION
 per generare timestamp.
 
-Per evitare aggiornamenti continui
-è necessario abilitare:
+Configurazione richiesta:
 
 Google Sheets Settings
 
