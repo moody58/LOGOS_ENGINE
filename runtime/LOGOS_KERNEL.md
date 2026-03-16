@@ -43,7 +43,7 @@ ENTITY\_CONFIRMATION
 
 LOGOS — Apps Script Kernel
 
-File: 0607\_LOGOS\_APPS\_SCRIPT\_KERNEL\_v1.4.gs
+File: 0607\_LOGOS\_APPS\_SCRIPT\_KERNEL\_v1.5.gs
 
 System: LOGOS Engine
 
@@ -69,7 +69,7 @@ function logEvent(eventType, sheetName, row, details) {
 
 
 
-&#x20; const ss = SpreadsheetApp.getActive();
+&#x20; const ss = SpreadsheetApp.getActiveSpreadsheet();
 
 &#x20; const logSheet = ss.getSheetByName("SYSTEM\_LOG");
 
@@ -125,7 +125,7 @@ function LOGOS\_inputTrigger(e) {
 
 
 
-&#x20; if (!e) return;
+&#x20; if (!e || !e.range) return;
 
 
 
@@ -139,9 +139,7 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; if (sheetName !== "RAW\_INPUT") return;
 
-
-
-&#x20; if (row === 1) return; // ignora header
+&#x20; if (row === 1) return;
 
 
 
@@ -199,15 +197,15 @@ function onEdit(e) {
 
 
 
+&#x20; if (!e || !e.range) return;
+
+
+
 &#x20; /\* ---- attivazione trigger ingestione ---- \*/
 
 
 
 &#x20; LOGOS\_inputTrigger(e);
-
-
-
-&#x20; if (!e) return;
 
 
 
@@ -421,15 +419,19 @@ ENTITY CONFIRMATION
 
 &#x20;     const confirmSheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
 
+&#x20;     if (!confirmSheet) return;
 
 
-&#x20;     const existingInputs = confirmSheet
 
-&#x20;       .getRange("A2:A" + confirmSheet.getLastRow())
+&#x20;     const lastRowConfirm = confirmSheet.getLastRow();
 
-&#x20;       .getValues()
 
-&#x20;       .flat();
+
+&#x20;     const existingInputs = lastRowConfirm > 1
+
+&#x20;       ? confirmSheet.getRange("A2:A" + lastRowConfirm).getValues().flat()
+
+&#x20;       : \[];
 
 
 

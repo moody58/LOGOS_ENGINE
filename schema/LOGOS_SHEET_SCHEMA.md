@@ -307,6 +307,18 @@ Source
 Notes
 
 
+VALIDAZIONI
+
+Entity_Type
+=SETTINGS!$G$2:$G
+
+Entity_Status
+=SETTINGS!$H$2:$H
+
+Parent_Entity_ID
+=ENTITIES!$A$2:$A
+
+
 FORMULE
 
 
@@ -1029,3 +1041,173 @@ Scrittura:
 Kernel.gs
 
 logEvent()
+
+
+------------------------------------------------
+OPEN ARCHITECTURE NODES
+------------------------------------------------
+
+
+NODE 1 — Movement ID Generation
+
+Status:
+OPEN
+
+Descrizione:
+
+La generazione dell'ID dei movimenti del ledger
+è attualmente gestita in due punti potenziali
+del sistema.
+
+Possibili implementazioni:
+
+A)
+
+Kernel.gs
+
+Generazione ID durante onEdit
+quando viene compilato Project_ID.
+
+B)
+
+Processor.gs
+
+Generazione ID durante scrittura
+buffer eventi verso RAW_DATA.
+
+Funzione individuata nel processor:
+
+LOGOS_generateMovementID()
+
+Decisione architetturale finale:
+
+DA DEFINIRE
+
+
+
+------------------------------------------------
+
+
+NODE 2 — Entity Resolution Matching Field
+
+Status:
+OPEN
+
+Descrizione:
+
+Il processor costruisce una mappa delle entità
+per risolvere automaticamente il soggetto
+inserito negli eventi.
+
+Implementazione attuale:
+
+buildEntityMap()
+
+Codice:
+
+map[entities[i][2]] = entities[i][0];
+
+Questo significa che il matching avviene
+sulla colonna:
+
+ENTITIES column index 2
+
+Attualmente corrisponde a:
+
+First_Name
+
+Possibile campo alternativo:
+
+Display_Name
+
+Decisione architetturale finale:
+
+DA DEFINIRE
+
+
+
+------------------------------------------------
+
+
+NODE 3 — Analytics Range Policy
+
+Status:
+TEMPORARY OPTIMIZATION
+
+Descrizione:
+
+Le formule analytics utilizzano range limitati
+per evitare rallentamenti di Google Sheets.
+
+Esempio:
+
+RAW_DATA!H2:H1002
+
+invece di
+
+RAW_DATA!H:H
+
+Motivazione:
+
+performance di SUMIFS in MAP + LAMBDA.
+
+Decisione futura:
+
+valutare migrazione a
+
+range dinamici
+oppure
+table expansion logic.
+
+
+
+------------------------------------------------
+
+
+NODE 4 — Range Inconsistency Analytics
+
+Status:
+KNOWN ISSUE
+
+Descrizione:
+
+Alcune formule analytics utilizzano
+limiti di range differenti.
+
+Esempi:
+
+A2:A200
+A2:A500
+A2:A2000
+
+Effetto:
+
+nessun errore funzionale
+ma possibile confusione manutentiva.
+
+Decisione futura:
+
+uniformare i range analytics.
+
+
+
+------------------------------------------------
+
+
+NODE 5 — Google Sheets System Requirement
+
+Status:
+REQUIRED CONFIGURATION
+
+Descrizione:
+
+Il sistema utilizza la funzione NOW()
+nella tabella ENTITY_CONFIRMATION
+per generare timestamp.
+
+Per evitare aggiornamenti continui
+è necessario abilitare:
+
+Google Sheets Settings
+
+Iterative Calculation: ENABLED

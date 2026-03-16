@@ -41,7 +41,11 @@ Motore fingerprint:
 
 projectId | entityId | dataEvento | tipo | valore | causale
 
------------ Script completo
+
+
+
+
+\----------- Script completo
 
 
 
@@ -49,7 +53,7 @@ projectId | entityId | dataEvento | tipo | valore | causale
 
 LOGOS ENGINE — INPUT PROCESSOR
 
-Versione: v1.6
+Versione: v1.7
 
 Pipeline: RAW\_INPUT → PROCESSOR → RAW\_DATA
 
@@ -104,8 +108,6 @@ function processRawInputV2() {
 /\* =====================================================
 
 QUEUE CURSOR
-
-Legge solo nuove righe inserite nella coda
 
 ===================================================== \*/
 
@@ -163,8 +165,6 @@ Legge solo nuove righe inserite nella coda
 
 HEADER MAPPING
 
-Identifica colonne tramite nome
-
 ===================================================== \*/
 
 
@@ -207,7 +207,7 @@ MAPPE PROGETTI / ENTITÀ
 
 /\* =====================================================
 
-FINGERPRINT SET (solo per questo batch)
+FINGERPRINT SET
 
 ===================================================== \*/
 
@@ -221,7 +221,7 @@ FINGERPRINT SET (solo per questo batch)
 
 /\* =====================================================
 
-BUFFER DI SCRITTURA
+BUFFER SCRITTURA
 
 ===================================================== \*/
 
@@ -379,7 +379,7 @@ RISOLUZIONE ENTITÀ
 
 /\* =====================================================
 
-GENERAZIONE FINGERPRINT EVENTO
+FINGERPRINT EVENTO
 
 ===================================================== \*/
 
@@ -425,7 +425,7 @@ GENERAZIONE FINGERPRINT EVENTO
 
 /\* =====================================================
 
-BUFFER EVENTO PER SCRITTURA LEDGER
+BUFFER LEDGER
 
 ===================================================== \*/
 
@@ -485,7 +485,7 @@ BUFFER EVENTO PER SCRITTURA LEDGER
 
 /\* =====================================================
 
-SCRITTURA LEDGER (APPEND-ONLY)
+SCRITTURA LEDGER
 
 ===================================================== \*/
 
@@ -555,7 +555,7 @@ AGGIORNAMENTO STATUS CODA
 
 /\* =====================================================
 
-AGGIORNAMENTO CURSORE CODA
+AGGIORNAMENTO CURSORE
 
 ===================================================== \*/
 
@@ -601,7 +601,15 @@ function validationEngine(event, projectMap) {
 
 
 
-&#x20; const projectId = projectMap\[event.projectName];
+&#x20; const key = event.projectName
+
+&#x20;   ? event.projectName.toString().trim().toLowerCase()
+
+&#x20;   : "";
+
+
+
+&#x20; const projectId = projectMap\[key];
 
 
 
@@ -637,7 +645,15 @@ function entityResolutionEngine(event, entityMap) {
 
 
 
-&#x20; const entityId = entityMap\[event.soggetto];
+&#x20; const key = event.soggetto
+
+&#x20;   ? event.soggetto.toString().trim().toLowerCase()
+
+&#x20;   : "";
+
+
+
+&#x20; const entityId = entityMap\[key];
 
 
 
@@ -679,7 +695,21 @@ function buildProjectMap(projects) {
 
 &#x20; for (let i = 1; i < projects.length; i++) {
 
-&#x20;   map\[projects\[i]\[1]] = projects\[i]\[0];
+
+
+&#x20;   const id = projects\[i]\[0];
+
+&#x20;   const name = projects\[i]\[1];
+
+
+
+&#x20;   if (name) {
+
+&#x20;     map\[name.toString().trim().toLowerCase()] = id;
+
+&#x20;   }
+
+
 
 &#x20; }
 
@@ -715,7 +745,31 @@ function buildEntityMap(entities) {
 
 &#x20; for (let i = 1; i < entities.length; i++) {
 
-&#x20;   map\[entities\[i]\[2]] = entities\[i]\[0];
+
+
+&#x20;   const id = entities\[i]\[0];
+
+&#x20;   const firstName = entities\[i]\[2];
+
+&#x20;   const displayName = entities\[i]\[5];
+
+
+
+&#x20;   if (firstName) {
+
+&#x20;     map\[firstName.toString().trim().toLowerCase()] = id;
+
+&#x20;   }
+
+
+
+&#x20;   if (displayName) {
+
+&#x20;     map\[displayName.toString().trim().toLowerCase()] = id;
+
+&#x20;   }
+
+
 
 &#x20; }
 
@@ -757,9 +811,55 @@ function generateEventFingerprint(event, projectId, entityId) {
 
 &#x20;   event.valore,
 
-&#x20;   event.causale
+&#x20;   event.causale,
+
+&#x20;   event.source
 
 &#x20; ].join("|");
+
+
+
+}
+
+
+
+
+
+
+
+/\* =====================================================
+
+MOVEMENT ID GENERATOR
+
+===================================================== \*/
+
+
+
+function LOGOS\_generateMovementID() {
+
+
+
+&#x20; const props = PropertiesService.getDocumentProperties();
+
+
+
+&#x20; let lastNumber = parseInt(props.getProperty("LAST\_MOV\_NUMBER")) || 0;
+
+
+
+&#x20; const nextNumber = lastNumber + 1;
+
+
+
+&#x20; props.setProperty("LAST\_MOV\_NUMBER", nextNumber);
+
+
+
+&#x20; const newId = "MOV\_" + String(nextNumber).padStart(6, "0");
+
+
+
+&#x20; return newId;
 
 
 
