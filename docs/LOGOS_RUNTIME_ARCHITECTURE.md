@@ -1,266 +1,239 @@
+# LOGOS Runtime Architecture
 
-# LOGOS_RUNTIME_ARCHITECTURE.md
+## Overview
 
-## System
-LOGOS — Runtime Architecture
+LOGOS è un motore di processamento eventi implementato su Google Sheets + Google Apps Script.
 
-LOGOS is designed as an event‑driven ledger system implemented on Google Sheets with Apps Script runtime orchestration.
+Il sistema segue un modello **event-driven ledger**.
 
-The runtime layer coordinates:
+Pipeline principale:
 
-- event ingestion
-- validation
-- entity resolution
-- ledger persistence
-- analytics aggregation
-- telemetry logging
+RAW_INPUT → PROCESSOR → RAW_DATA
 
----
+Tabelle di dimensione:
 
-# Runtime Overview
+- PROJECTS
+- ENTITIES
 
-Pipeline:
+Tabelle di supporto:
 
-RAW_INPUT → Processor → RAW_DATA → Analytics → Reporting
+- ENTITY_CONFIRMATION
+- SYSTEM_LOG
 
-Where:
-
-RAW_INPUT acts as the event queue  
-Processor executes validation and ingestion logic  
-RAW_DATA is the immutable ledger  
-Analytics tables compute derived metrics
+Il processor legge gli eventi dalla coda, valida i dati, risolve le entità e scrive movimenti nel ledger.
 
 ---
 
-# Runtime Layers
+# Runtime Flow
 
-## 1 — Input Layer
+## Event Ingestion
 
-Tables:
+Eventi possono arrivare da:
+
+- Google Forms
+- API
+- Import CSV
+- Automazioni
+- Inserimento manuale (fase sviluppo)
+
+Gli eventi vengono scritti nella tabella:
 
 RAW_INPUT
 
-Purpose:
+Campo chiave:
 
-Acts as the ingestion queue for all external inputs.
+Status
 
-Possible input sources:
+Valori possibili:
 
-- Manual entry
-- Google Forms
-- API integrations
-- Siri shortcuts
-- CSV imports
-- automation scripts
-
-Each record enters the system with:
-
-Status = NEW
-
-This status activates the ingestion pipeline.
+NEW  
+WRITTEN  
+ERROR_PROJECT  
+ENTITY_PENDING  
+DUPLICATE
 
 ---
 
-## 2 — Processor Layer
+# Processor Engine
 
-Runtime component:
+Script principale:
 
 processRawInputV2()
 
-Responsibilities:
+Responsabilità:
 
-- read events from RAW_INPUT
-- validate project existence
-- resolve entity identity
-- generate event fingerprint
-- prevent duplicate processing
-- assign movement ID
-- append ledger entry
-
-Processing flow:
-
-NEW → validation → entity resolution → fingerprint check → ledger append
+1 Lettura eventi NEW  
+2 Validazione progetto  
+3 Risoluzione entità  
+4 Deduplicazione evento  
+5 Scrittura ledger  
+6 Aggiornamento status
 
 ---
 
-## 3 — Ledger Layer
+# RAW_DATA — Ledger
 
-Table:
+RAW_DATA è un ledger append-only.
+
+Campi principali:
+
+Movement_ID  
+Timestamp  
+Event_Date  
+Subject  
+Project_ID  
+Entity_ID  
+Movement_Type  
+Amount  
+Causale  
+Reference_ID  
+Source  
+Payment_Method  
+Notes
+
+Regole ledger:
+
+- Append only
+- Nessuna modifica storica
+- Nessuna cancellazione
+
+Questo garantisce integrità contabile.
+
+---
+
+# SYSTEM_LOG
+
+SYSTEM_LOG registra eventi runtime.
+
+Generato dalla funzione:
+
+logEvent()
+
+Eventi tracciati:
+
+INPUT_PROCESSOR_START  
+INPUT_WRITTEN  
+INPUT_BATCH_COMPLETED  
+INPUT_ERROR_PROJECT  
+INPUT_ENTITY_PENDING  
+INPUT_DUPLICATE_SKIPPED
+
+Il log è fondamentale per debugging e auditing.
+
+---
+
+# ENTITY_CONFIRMATION
+
+Quando viene rilevata un'entità sconosciuta:
+
+1 Il processor crea una riga in ENTITY_CONFIRMATION  
+2 Lo stato diventa PENDING  
+3 L'utente valida l'entità  
+4 L'entità viene creata in ENTITIES
+
+Questo evita errori di inserimento automatico.
+
+---
+
+# Dimension Tables
+
+## PROJECTS
+
+Contiene l'elenco dei progetti.
+
+Campi principali:
+
+Project_ID  
+Project_Name  
+Parent_Project_ID  
+Project_Type  
+Status  
+Start_Date  
+End_Date  
+Created_Timestamp
+
+Il processor usa PROJECTS per validare gli eventi.
+
+---
+
+## ENTITIES
+
+Contiene soggetti del sistema:
+
+- clienti
+- fornitori
+- persone
+- organizzazioni
+
+Campi principali:
+
+Entity_ID  
+Entity_Type  
+First_Name  
+Last_Name  
+Display_Name  
+Parent_Entity_ID  
+Created_Timestamp  
+Modified_Timestamp
+
+Il processor costruisce una mappa per risolvere:
+
+First_Name  
+Display_Name
+
+---
+
+# Processing Model
+
+LOGOS utilizza un modello di processamento batch.
+
+Ogni run del processor:
+
+- legge nuovi eventi
+- elabora fino a MAX_EVENTS_PER_RUN
+- aggiorna lo status
+
+Questo evita timeout di Apps Script.
+
+---
+
+# Scalabilità
+
+Prestazioni osservate:
+
+~1000 eventi / minuto
+
+Il sistema può gestire facilmente:
+
+30k – 80k movimenti ledger
+
+Prima che sia necessario migrare verso:
+
+- SQL
+- Baserow
+- Backend dedicato
+
+---
+
+# Architettura concettuale
+
+Event Queue:
+
+RAW_INPUT
+
+Worker:
+
+PROCESSOR
+
+Ledger:
 
 RAW_DATA
 
-Characteristics:
-
-- append‑only
-- immutable historical record
-- event sourced
-
-Fields include:
-
-Movement ID  
-Timestamp  
-Project_ID  
-Entity_ID  
-Tipo_Movimento  
-Valore
-
-Derived fields:
-
-Unita  
-Categoria_Derivata
-
-Ledger guarantees:
-
-- traceability
-- chronological order
-- auditability
-
----
-
-## 4 — Dimension Tables
-
-Tables:
+Dimension:
 
 PROJECTS  
-ENTITIES  
-SETTINGS
+ENTITIES
 
-Purpose:
-
-Provide reference data for the ledger.
-
-PROJECTS:
-
-Defines project hierarchy and metadata.
-
-ENTITIES:
-
-Defines people, organizations, or economic actors.
-
-SETTINGS:
-
-Holds system configuration values and dropdown sources.
-
----
-
-## 5 — Workflow Layer
-
-Table:
-
-ENTITY_CONFIRMATION
-
-Purpose:
-
-Resolve unknown entities detected during ingestion.
-
-Process:
-
-RAW_DATA entry → entity not found → record created in ENTITY_CONFIRMATION
-
-Possible states:
-
-PENDING  
-SUGGESTED  
-CONFIRMED
-
-Once confirmed the entity can be added to ENTITIES.
-
----
-
-## 6 — Analytics Layer
-
-Tables:
-
-CONTROLLO_PROJECT_DETTAGLIO  
-CONTROLLO_PROJECT  
-CONTROLLO_ENTITY_DETTAGLIO  
-CONTROLLO_ENTITY
-
-Purpose:
-
-Compute metrics derived from ledger events.
-
-Typical metrics:
-
-- hours
-- expenses
-- revenue
-- margin
-- movement count
-
-Analytics uses:
-
-MAP + LAMBDA + SUMIFS pattern.
-
-This enables scalable aggregation inside Google Sheets.
-
----
-
-## 7 — Telemetry Layer
-
-Table:
+Audit:
 
 SYSTEM_LOG
-
-Responsible component:
-
-Kernel
-
-Purpose:
-
-Record runtime system events.
-
-Examples:
-
-INPUT_TRIGGER  
-INPUT_WRITTEN  
-ENTITY_CONFIRMATION_REQUIRED  
-PRIMARY_KEY_PROTECTION
-
-Each log entry records:
-
-timestamp  
-event type  
-sheet  
-row  
-user  
-details
-
----
-
-# Runtime Guarantees
-
-The system guarantees:
-
-Event integrity  
-Traceable ingestion  
-Deterministic processing  
-Append‑only ledger  
-Deterministic analytics views
-
----
-
-# Operational Characteristics
-
-LOGOS behaves similarly to a simplified:
-
-Event Sourcing System
-
-Key characteristics:
-
-events stored as immutable ledger entries  
-derived analytics computed from ledger  
-entity resolution handled asynchronously
-
----
-
-# Future Extensions
-
-Possible runtime evolution:
-
-- API ingestion endpoints
-- webhook triggers
-- external database mirror
-- migration to SQL engine
-- event streaming architecture
-
