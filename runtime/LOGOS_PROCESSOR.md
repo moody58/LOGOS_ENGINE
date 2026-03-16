@@ -1,59 +1,8 @@
-# LOGOS\_PROCESSOR.md
-
-\#DOC.LOGOS\_PROCESSOR
-
-Pipeline:
-
-RAW\_INPUT → Processor → RAW\_DATA
-
-Funzione principale:
-
-processRawInputV2()
-
-Fasi:
-
-1. Lettura coda
-2. Header mapping
-3. Validazione progetto
-4. Risoluzione entità
-5. Generazione fingerprint
-6. Deduplicazione batch
-7. Scrittura ledger
-8. Aggiornamento stato
-
-Stati RAW\_INPUT:
-
-NEW
-WRITTEN
-ERROR\_PROJECT
-ENTITY\_PENDING
-DUPLICATE
-
-Buffer di scrittura:
-
-ledgerBuffer → append RAW\_DATA
-
-Controlli:
-
-MAX\_EVENTS\_PER\_RUN = 50
-
-Motore fingerprint:
-
-projectId | entityId | dataEvento | tipo | valore | causale
-
-
-
-
-
-\----------- Script completo
-
-
-
 /\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
 LOGOS ENGINE — INPUT PROCESSOR
 
-Versione: v1.7
+Versione: v1.8
 
 Pipeline: RAW\_INPUT → PROCESSOR → RAW\_DATA
 
@@ -185,15 +134,25 @@ HEADER MAPPING
 
 /\* =====================================================
 
-MAPPE PROGETTI / ENTITÀ
+MAPPE PROGETTI / ENTITÀ (ottimizzato)
 
 ===================================================== \*/
 
 
 
-&#x20; const projects = projectsSheet.getDataRange().getValues();
+&#x20; const projects = projectsSheet
 
-&#x20; const entities = entitiesSheet.getDataRange().getValues();
+&#x20;   .getRange(2,1,projectsSheet.getLastRow()-1,2)
+
+&#x20;   .getValues();
+
+
+
+&#x20; const entities = entitiesSheet
+
+&#x20;   .getRange(2,1,entitiesSheet.getLastRow()-1,6)
+
+&#x20;   .getValues();
 
 
 
@@ -253,11 +212,17 @@ PROCESSAMENTO CODA
 
 &#x20;   const row = inputData\[r];
 
-&#x20;   const status = row\[headerIndex\["Status"]];
+
+
+&#x20;   const status = (row\[headerIndex\["Status"]] || "")
+
+&#x20;     .toString()
+
+&#x20;     .trim();
 
 
 
-&#x20;   if (!status || status !== "NEW") continue;
+&#x20;   if (status !== "NEW") continue;
 
 
 
@@ -385,7 +350,15 @@ FINGERPRINT EVENTO
 
 
 
-&#x20;   const fingerprint = generateEventFingerprint(event, validation.projectId, entityResult.entityId);
+&#x20;   const fingerprint = generateEventFingerprint(
+
+&#x20;     event,
+
+&#x20;     validation.projectId,
+
+&#x20;     entityResult.entityId
+
+&#x20;   );
 
 
 
@@ -501,7 +474,17 @@ SCRITTURA LEDGER
 
 &#x20;   ledgerSheet
 
-&#x20;     .getRange(startRowLedger,1,ledgerBuffer.length,ledgerBuffer\[0].length)
+&#x20;     .getRange(
+
+&#x20;       startRowLedger,
+
+&#x20;       1,
+
+&#x20;       ledgerBuffer.length,
+
+&#x20;       ledgerBuffer\[0].length
+
+&#x20;     )
 
 &#x20;     .setValues(ledgerBuffer);
 
@@ -529,25 +512,51 @@ SCRITTURA LEDGER
 
 /\* =====================================================
 
-AGGIORNAMENTO STATUS CODA
+AGGIORNAMENTO STATUS CODA (batch)
 
 ===================================================== \*/
 
 
 
-&#x20; statusUpdates.forEach(function(update) {
+&#x20; if (statusUpdates.length > 0) {
+
+
+
+&#x20;   const statusCol = headerIndex\["Status"] + 1;
+
+
+
+&#x20;   const statusRange = inputSheet
+
+&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
+
+&#x20;     .getValues();
+
+
+
+&#x20;   statusUpdates.forEach(function(update){
+
+
+
+&#x20;     const rowIndex = update\[0] - startRow;
+
+&#x20;     statusRange\[rowIndex]\[0] = update\[1];
+
+
+
+&#x20;   });
 
 
 
 &#x20;   inputSheet
 
-&#x20;     .getRange(update\[0],headerIndex\["Status"]+1)
+&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
 
-&#x20;     .setValue(update\[1]);
+&#x20;     .setValues(statusRange);
 
 
 
-&#x20; });
+&#x20; }
 
 
 
@@ -693,7 +702,7 @@ function buildProjectMap(projects) {
 
 
 
-&#x20; for (let i = 1; i < projects.length; i++) {
+&#x20; for (let i = 0; i < projects.length; i++) {
 
 
 
@@ -743,7 +752,7 @@ function buildEntityMap(entities) {
 
 
 
-&#x20; for (let i = 1; i < entities.length; i++) {
+&#x20; for (let i = 0; i < entities.length; i++) {
 
 
 
