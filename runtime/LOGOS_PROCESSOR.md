@@ -388,17 +388,103 @@ VALIDAZIONE PROGETTO
 
 /\* =====================================================
 
-RISOLUZIONE ENTITÀ
+RISOLUZIONE ENTITÀ + AUTO MATCH INTELLIGENTE
 
 ===================================================== \*/
 
 
 
-const entityResult = entityResolutionEngine(normalizedEvent, entityMap);
+let entityResult = entityResolutionEngine(normalizedEvent, entityMap);
+
+
+
+/\* =====================================================
+
+AUTO MATCH (CONSERVATIVO)
+
+===================================================== \*/
 
 
 
 if (entityResult.status !== "OK") {
+
+
+
+&#x20; const inputText = (normalizedEvent.soggetto || "").toString().trim();
+
+
+
+&#x20; if (inputText) {
+
+
+
+&#x20;   const suggestions = suggestEntity(inputText, entityMap);
+
+
+
+&#x20;   if (suggestions \&\& suggestions.length > 0) {
+
+
+
+&#x20;     const bestMatch = suggestions\[0];
+
+
+
+&#x20;     // soglia conservativa
+
+&#x20;     if (bestMatch.score >= 0.85) {
+
+
+
+&#x20;       entityResult = {
+
+&#x20;         status: "OK",
+
+&#x20;         entityId: bestMatch.id
+
+&#x20;       };
+
+
+
+&#x20;       logEvent(
+
+&#x20;         "ENTITY\_AUTO\_MATCH",
+
+&#x20;         "RAW\_INPUT",
+
+&#x20;         startRow + r,
+
+&#x20;         "Match automatico: " + inputText + " → " + bestMatch.name
+
+&#x20;       );
+
+&#x20;     }
+
+&#x20;   }
+
+&#x20; }
+
+}
+
+
+
+/\* =====================================================
+
+GESTIONE ENTITY NON RISOLTA
+
+===================================================== \*/
+
+
+
+if (entityResult.status !== "OK") {
+
+
+
+&#x20; // =====================================================
+
+&#x20; // CASO 1 → NUOVO EVENTO (NEW)
+
+&#x20; // =====================================================
 
 
 
@@ -448,8 +534,6 @@ if (entityResult.status !== "OK") {
 
 
 
-&#x20;     const inputText = (normalizedEvent.soggetto || "").toString().trim();
-
 &#x20;     const inputKey = inputText.toLowerCase();
 
 
@@ -459,6 +543,8 @@ if (entityResult.status !== "OK") {
 
 
 &#x20;     for (let i = 0; i < existing.length; i++) {
+
+
 
 &#x20;       const existingText = (existing\[i]\[0] || "")
 
@@ -535,6 +621,14 @@ if (entityResult.status !== "OK") {
 &#x20;   continue;
 
 &#x20; }
+
+
+
+&#x20; // =====================================================
+
+&#x20; // CASO 2 → GIÀ ENTITY\_PENDING
+
+&#x20; // =====================================================
 
 
 
