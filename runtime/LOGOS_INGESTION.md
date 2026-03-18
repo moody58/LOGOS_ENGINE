@@ -1,124 +1,284 @@
-/*******************************************************
- LOGOS — INGESTION LAYER
- File: ingestion.gs
- Sistema: LOGOS Engine
- Ruolo: Entry point per scrittura eventi in RAW_INPUT
-*******************************************************/
+/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
-function LOGOS_ingestEvent(event) {
+&#x20;LOGOS — INGESTION LAYER
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("RAW_INPUT");
+&#x20;File: ingestion.gs
 
-  if (!sheet) {
-    throw new Error("Sheet RAW_INPUT non trovato");
-  }
+&#x20;Sistema: LOGOS Engine
 
-  const now = new Date();
+&#x20;Ruolo: Entry point per scrittura eventi in RAW\_INPUT
 
-  const row = [
-    now,
-    event.project_name || "",
-    event.tipo || "",
-    event.valore || "",
-    event.data_evento || "",
-    event.causale || "",
-    event.riferimento || "",
-    event.metodo_pagamento || "",
-    event.note || "",
-    event.soggetto || "",
-    event.source || "WEBAPP",
-    "NEW"
-  ];
 
-  sheet.appendRow(row);
+
+&#x20;NOTE ARCHITETTURALI:
+
+&#x20;- Questo layer NON contiene logica di business
+
+&#x20;- ENTITY COMMIT è TEMPORANEO (verrà spostato in Entity Engine)
+
+\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
+
+
+
+
+
+/\* =====================================================
+
+INGEST EVENT
+
+===================================================== \*/
+
+
+
+function LOGOS\_ingestEvent(event) {
+
+
+
+&#x20; const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+&#x20; const sheet = ss.getSheetByName("RAW\_INPUT");
+
+
+
+&#x20; if (!sheet) {
+
+&#x20;   throw new Error("Sheet RAW\_INPUT non trovato");
+
+&#x20; }
+
+
+
+&#x20; const now = new Date();
+
+
+
+&#x20; const row = \[
+
+&#x20;   now,
+
+&#x20;   event.project\_name || "",
+
+&#x20;   event.tipo || "",
+
+&#x20;   event.valore || "",
+
+&#x20;   event.data\_evento || "",
+
+&#x20;   event.causale || "",
+
+&#x20;   event.riferimento || "",
+
+&#x20;   event.metodo\_pagamento || "",
+
+&#x20;   event.note || "",
+
+&#x20;   event.soggetto || "",
+
+&#x20;   event.source || "WEBAPP",
+
+&#x20;   "NEW"
+
+&#x20; ];
+
+
+
+&#x20; sheet.appendRow(row);
+
+
+
+&#x20; // Trigger gestito dal KERNEL (non qui)
+
 }
 
-/**
- * TEST MANUALE — Inserimento evento di prova
- */
-function LOGOS_testInsert() {
 
-  const testEvent = {
-    project_name: "TEST_PROJECT",
-    tipo: "Spesa",
-    valore: 100,
-    data_evento: new Date(),
-    causale: "Test ingestione",
-    riferimento: "TEST_001",
-    metodo_pagamento: "Contanti",
-    note: "Evento di test",
-    soggetto: "Test User",
-    source: "TEST"
-  };
 
-  LOGOS_ingestEvent(testEvent);
+
+
+/\* =====================================================
+
+TEST MANUALE
+
+===================================================== \*/
+
+
+
+function LOGOS\_testInsert() {
+
+
+
+&#x20; const testEvent = {
+
+&#x20;   project\_name: "TEST\_PROJECT",
+
+&#x20;   tipo: "Spesa",
+
+&#x20;   valore: 100,
+
+&#x20;   data\_evento: new Date(),
+
+&#x20;   causale: "Test ingestione",
+
+&#x20;   riferimento: "TEST\_001",
+
+&#x20;   metodo\_pagamento: "Contanti",
+
+&#x20;   note: "Evento di test",
+
+&#x20;   soggetto: "Test User",
+
+&#x20;   source: "TEST"
+
+&#x20; };
+
+
+
+&#x20; LOGOS\_ingestEvent(testEvent);
+
 }
 
-/**
- * RESET CURSORE PROCESSOR
- */
-function LOGOS_resetQueueCursor() {
 
-  const props = PropertiesService.getDocumentProperties();
-  props.setProperty("LOGOS_QUEUE_CURSOR", 1);
 
-  Logger.log("Queue cursor resettato a 1");
+
+
+/\* =====================================================
+
+RESET CURSORE PROCESSOR
+
+===================================================== \*/
+
+
+
+function LOGOS\_resetQueueCursor() {
+
+
+
+&#x20; const props = PropertiesService.getDocumentProperties();
+
+&#x20; props.setProperty("LOGOS\_QUEUE\_CURSOR", 1);
+
+
+
+&#x20; Logger.log("Queue cursor resettato a 1");
+
 }
 
-/* =====================================================
-ENTITY COMMIT (SINGLE — STANDARD)
-⚠️ TEMPORANEO: resterà qui fino a refactor completo
-===================================================== */
 
-function LOGOS_commitSingleEntity(row) {
 
-  const ss = SpreadsheetApp.getActive();
-  const entitySheet = ss.getSheetByName("ENTITY_CONFIRMATION");
-  const entitiesSheet = ss.getSheetByName("ENTITIES");
 
-  const data = entitySheet.getRange(row,1,1,7).getValues()[0];
 
-  const inputText = data[0];
-  const confirmedId = data[4];
+/\* =====================================================
 
-  if (confirmedId) return;
+ENTITY COMMIT (TEMPORANEO — DA SPOSTARE)
 
-  const newId = generateEntityId();
+===================================================== \*/
 
-  entitiesSheet.appendRow([
-    newId,
-    "",
-    inputText,
-    "",
-    "",
-    inputText
-  ]);
 
-  entitySheet.getRange(row,5).setValue(newId);
-  entitySheet.getRange(row,7).setValue("CONFIRMED");
 
-  logEvent(
-    "ENTITY_COMMITTED",
-    "ENTITIES",
-    row,
-    "Nuova entità creata: " + inputText
-  );
+function LOGOS\_commitSingleEntity(row) {
+
+
+
+&#x20; const ss = SpreadsheetApp.getActive();
+
+&#x20; const entitySheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
+
+&#x20; const entitiesSheet = ss.getSheetByName("ENTITIES");
+
+
+
+&#x20; const data = entitySheet.getRange(row,1,1,7).getValues()\[0];
+
+
+
+&#x20; const inputText = (data\[0] || "").toString().trim();
+
+&#x20; const confirmedId = data\[4];
+
+
+
+&#x20; if (confirmedId || !inputText) return;
+
+
+
+&#x20; const newId = generateEntityId();
+
+
+
+&#x20; entitiesSheet.appendRow(\[
+
+&#x20;   newId,
+
+&#x20;   "",
+
+&#x20;   inputText,
+
+&#x20;   "",
+
+&#x20;   "",
+
+&#x20;   inputText
+
+&#x20; ]);
+
+
+
+&#x20; entitySheet.getRange(row,5).setValue(newId);
+
+&#x20; entitySheet.getRange(row,7).setValue("CONFIRMED");
+
+
+
+&#x20; logEvent(
+
+&#x20;   "ENTITY\_COMMITTED",
+
+&#x20;   "ENTITIES",
+
+&#x20;   row,
+
+&#x20;   "Nuova entità creata: " + inputText
+
+&#x20; );
+
 }
 
-/* =====================================================
+
+
+
+
+/\* =====================================================
+
 ENTITY ID GENERATOR (UNICO)
-===================================================== */
+
+===================================================== \*/
+
+
 
 function generateEntityId() {
 
-  const props = PropertiesService.getDocumentProperties();
 
-  let last = parseInt(props.getProperty("LAST_ENTITY_ID")) || 0;
 
-  const next = last + 1;
+&#x20; const props = PropertiesService.getDocumentProperties();
 
-  props.setProperty("LAST_ENTITY_ID", next);
 
-  return "ENT_" + String(next).padStart(6,"0");
+
+&#x20; let last = parseInt(props.getProperty("LAST\_ENTITY\_ID") || "0");
+
+
+
+&#x20; if (isNaN(last)) last = 0;
+
+
+
+&#x20; const next = last + 1;
+
+
+
+&#x20; props.setProperty("LAST\_ENTITY\_ID", next);
+
+
+
+&#x20; return "ENT\_" + String(next).padStart(6,"0");
+
 }
+
