@@ -1,10 +1,10 @@
 /\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
 
-LOGOS — Apps Script Kernel CLEAN
+LOGOS — Apps Script Kernel (CLEAN)
 
-Versione: v2.0 (Baserow-ready)
+Versione: v2.0 STABLE
 
-Ruolo: Orchestrazione eventi + protezioni
+Ruolo: Orchestrazione eventi (NO business logic)
 
 \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
 
@@ -54,6 +54,8 @@ function logEvent(eventType, sheetName, row, details) {
 
 &#x20; ]);
 
+
+
 }
 
 
@@ -62,7 +64,7 @@ function logEvent(eventType, sheetName, row, details) {
 
 /\* =====================================================
 
-INPUT TRIGGER (UNICA AUTORITÀ PROCESSOR)
+INPUT TRIGGER (PROCESSOR ENTRY POINT)
 
 ===================================================== \*/
 
@@ -118,6 +120,8 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; }
 
+
+
 }
 
 
@@ -126,7 +130,7 @@ function LOGOS\_inputTrigger(e) {
 
 /\* =====================================================
 
-ON EDIT CORE HANDLER
+ON EDIT CORE HANDLER (ORCHESTRAZIONE PURA)
 
 ===================================================== \*/
 
@@ -148,10 +152,6 @@ function onEdit(e) {
 
 &#x20; const col = e.range.getColumn();
 
-&#x20; const props = PropertiesService.getDocumentProperties();
-
-&#x20; const ss = e.source;
-
 
 
 &#x20; if (row === 1) return;
@@ -170,7 +170,63 @@ function onEdit(e) {
 
 &#x20; if (sheetName === "RAW\_INPUT") {
 
+
+
 &#x20;   LOGOS\_inputTrigger(e);
+
+&#x20;   return;
+
+&#x20; }
+
+
+
+
+
+&#x20; /\* =====================================================
+
+&#x20; ENTITY\_CONFIRMATION → COMMIT + REPROCESS
+
+&#x20; ===================================================== \*/
+
+
+
+&#x20; if (sheetName === "ENTITY\_CONFIRMATION") {
+
+
+
+&#x20;   if (col !== 4 || row < 2) return;
+
+
+
+&#x20;   const value = (e.value || "").toString().trim();
+
+
+
+&#x20;   if (value !== "Confirm") return;
+
+
+
+&#x20;   LOGOS\_commitSingleEntity(row);
+
+
+
+&#x20;   logEvent(
+
+&#x20;     "AUTO\_REPROCESS\_TRIGGER",
+
+&#x20;     "ENTITY\_CONFIRMATION",
+
+&#x20;     row,
+
+&#x20;     "Reprocess automatico avviato"
+
+&#x20;   );
+
+
+
+&#x20;   processRawInputV2();
+
+
 
 &#x20;   return;
 
@@ -252,162 +308,6 @@ function onEdit(e) {
 
 &#x20; /\* =====================================================
 
-&#x20; RAW\_DATA — ENTITY CONFIRMATION
-
-&#x20; ===================================================== \*/
-
-
-
-&#x20; if (sheetName === "RAW\_DATA") {
-
-
-
-&#x20;   const entityInputColumn = 4;
-
-&#x20;   const entityIdColumn = 6;
-
-
-
-&#x20;   const entityInput = sheet.getRange(row, entityInputColumn).getValue();
-
-&#x20;   const entityId = sheet.getRange(row, entityIdColumn).getValue();
-
-
-
-&#x20;   if (entityInput \&\& !entityId) {
-
-
-
-&#x20;     const confirmSheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
-
-&#x20;     if (!confirmSheet) return;
-
-
-
-&#x20;     const lastRowConfirm = confirmSheet.getLastRow();
-
-
-
-&#x20;     const existingInputs = lastRowConfirm > 1
-
-&#x20;       ? confirmSheet.getRange("A2:A" + lastRowConfirm).getValues().flat()
-
-&#x20;       : \[];
-
-
-
-&#x20;     const normalizedInput = entityInput.toString().trim().toLowerCase();
-
-
-
-&#x20;     const exists = existingInputs.some(v =>
-
-&#x20;       v \&\& v.toString().trim().toLowerCase() === normalizedInput
-
-&#x20;     );
-
-
-
-&#x20;     if (!exists) {
-
-
-
-&#x20;       confirmSheet.appendRow(\[
-
-&#x20;         entityInput,
-
-&#x20;         "",
-
-&#x20;         "",
-
-&#x20;         "",
-
-&#x20;         "",
-
-&#x20;         new Date(),
-
-&#x20;         "PENDING"
-
-&#x20;       ]);
-
-
-
-&#x20;       logEvent(
-
-&#x20;         "ENTITY\_CONFIRMATION\_REQUIRED",
-
-&#x20;         sheetName,
-
-&#x20;         row,
-
-&#x20;         "Nuovo soggetto rilevato: " + entityInput
-
-&#x20;       );
-
-&#x20;     }
-
-&#x20;   }
-
-&#x20; }
-
-
-
-
-
-&#x20; /\* =====================================================
-
-&#x20; ENTITY\_CONFIRMATION — COMMIT + REPROCESS
-
-&#x20; ===================================================== \*/
-
-
-
-&#x20; if (sheetName === "ENTITY\_CONFIRMATION") {
-
-
-
-&#x20;   if (col !== 4 || row < 2) return;
-
-
-
-&#x20;   const value = (e.value || "").toString().trim();
-
-&#x20;   if (value !== "Confirm") return;
-
-
-
-&#x20;   LOGOS\_commitSingleEntity(row);
-
-
-
-&#x20;   logEvent(
-
-&#x20;     "AUTO\_REPROCESS\_TRIGGER",
-
-&#x20;     "ENTITY\_CONFIRMATION",
-
-&#x20;     row,
-
-&#x20;     "Reprocess automatico avviato"
-
-&#x20;   );
-
-
-
-&#x20;   processRawInputV2();
-
-
-
-&#x20;   return;
-
-&#x20; }
-
-
-
-
-
-&#x20; /\* =====================================================
-
 &#x20; PROJECTS — CREAZIONE PROGETTO
 
 &#x20; ===================================================== \*/
@@ -415,6 +315,10 @@ function onEdit(e) {
 
 
 &#x20; if (sheetName === "PROJECTS") {
+
+
+
+&#x20;   const props = PropertiesService.getDocumentProperties();
 
 
 
@@ -512,7 +416,7 @@ function onEdit(e) {
 
 &#x20; /\* =====================================================
 
-&#x20; ENTITIES — METADATA
+&#x20; ENTITIES — METADATA (NO ID GENERATION)
 
 &#x20; ===================================================== \*/
 
