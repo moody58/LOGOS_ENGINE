@@ -86,6 +86,8 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; const row = e.range.getRow();
 
+&#x20; const ss = e.source;
+
 
 
 &#x20; if (sheetName !== "RAW\_INPUT") return;
@@ -152,31 +154,195 @@ function onEdit(e) {
 
 &#x20; const row = e.range.getRow();
 
+&#x20; const col = e.range.getColumn();
+
+&#x20; const ss = e.source;
+
 
 
 &#x20; if (row === 1) return;
 
 
 
-&#x20; /\* ---- TRIGGER PROCESSOR (ISOLATO) ---- \*/
+&#x20; /\* =====================================================
+
+RAW\_INPUT — AUTOCOMPLETE + TRIGGER PROCESSOR
+
+===================================================== \*/
 
 
 
-&#x20; if (sheetName === "RAW\_INPUT") {
+if (sheetName === "RAW\_INPUT") {
 
-&#x20;   LOGOS\_inputTrigger(e);
 
-&#x20;   return;
+
+&#x20; const soggettoCol = 10;
+
+&#x20; const suggestCol = 13;
+
+
+
+&#x20; /\* =====================================================
+
+&#x20; AUTOCOMPLETE ENTITY (LIVE)
+
+&#x20; ===================================================== \*/
+
+
+
+&#x20; if (col === soggettoCol \&\& row > 1) {
+
+
+
+&#x20;   const input = (e.value || "").toString().trim();
+
+
+
+&#x20;   if (!input) {
+
+&#x20;     sheet.getRange(row, suggestCol).setValue("");
+
+&#x20;   } else {
+
+
+
+&#x20;     const entitiesSheet = ss.getSheetByName("ENTITIES");
+
+
+
+&#x20;     if (entitiesSheet) {
+
+
+
+&#x20;       const lastRow = entitiesSheet.getLastRow();
+
+
+
+&#x20;       if (lastRow > 1) {
+
+
+
+&#x20;         const entities = entitiesSheet
+
+&#x20;           .getRange(2,1,lastRow-1,6)
+
+&#x20;           .getValues();
+
+
+
+&#x20;         const entityMap = buildEntityMap(entities);
+
+
+
+&#x20;         const suggestions = suggestEntity(input, entityMap);
+
+
+
+&#x20;         if (suggestions \&\& suggestions.length > 0) {
+
+
+
+&#x20;           const text = suggestions
+
+&#x20;             .map(s => s.name)
+
+&#x20;             .slice(0,3)
+
+&#x20;             .join(" | ");
+
+
+
+&#x20;           sheet.getRange(row, suggestCol).setValue(text);
+
+
+
+&#x20;         } else {
+
+
+
+&#x20;           sheet.getRange(row, suggestCol).setValue("");
+
+
+
+&#x20;         }
+
+&#x20;       }
+
+&#x20;     }
+
+&#x20;   }
 
 &#x20; }
 
 
 
-&#x20; const col = e.range.getColumn();
+&#x20; /\* =====================================================
 
-&#x20; const props = PropertiesService.getDocumentProperties();
+&#x20; CLICK SUGGERIMENTO → AUTOCOMPILA SOGGETTO
 
-&#x20; const ss = e.source;
+&#x20; ===================================================== \*/
+
+
+
+&#x20; if (col === suggestCol \&\& row > 1) {
+
+
+
+&#x20;   const value = (e.value || "").toString().trim();
+
+
+
+&#x20;   if (value) {
+
+
+
+&#x20;     const first = value.split("|")\[0].trim();
+
+
+
+&#x20;     if (first) {
+
+
+
+&#x20;       sheet.getRange(row, soggettoCol).setValue(first);
+
+
+
+&#x20;       logEvent(
+
+&#x20;         "ENTITY\_SUGGESTION\_APPLIED",
+
+&#x20;         "RAW\_INPUT",
+
+&#x20;         row,
+
+&#x20;         "Suggerimento applicato: " + first
+
+&#x20;       );
+
+&#x20;     }
+
+&#x20;   }
+
+&#x20; }
+
+
+
+&#x20; /\* =====================================================
+
+&#x20; TRIGGER PROCESSOR
+
+&#x20; ===================================================== \*/
+
+
+
+&#x20; LOGOS\_inputTrigger(e);
+
+
+
+&#x20; return;
+
+}
 
 
 
@@ -380,7 +546,35 @@ ENTITY\_CONFIRMATION — COMMIT ENTITY
 
 &#x20;   LOGOS\_commitSingleEntity(row);
 
-&#x20;   return;
+
+
+/\* =====================================================
+
+AUTO REPROCESS DOPO CONFIRMA ENTITY
+
+===================================================== \*/
+
+
+
+logEvent(
+
+&#x20; "AUTO\_REPROCESS\_TRIGGER",
+
+&#x20; "ENTITY\_CONFIRMATION",
+
+&#x20; row,
+
+&#x20; "Reprocess automatico avviato"
+
+);
+
+
+
+processRawInputV2();
+
+
+
+return;
 
 &#x20; }
 
