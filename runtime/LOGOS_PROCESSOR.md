@@ -72,39 +72,43 @@ QUEUE CURSOR
 
 
 
-&#x20; let queueCursor = parseInt(props.getProperty("LOGOS\_QUEUE\_CURSOR")) || 1;
-
-
-
-&#x20; const startRow = Math.max(2, queueCursor + 1);
+&#x20; const startRow = 2;
 
 &#x20; const numRows = lastRow - startRow + 1;
 
 
 
-&#x20; if (numRows <= 0) {
+// =====================================================
+
+// SAFETY CHECK — evita range invalidi
+
+// =====================================================
 
 
 
-&#x20;   logEvent(
-
-&#x20;     "INPUT\_BATCH\_COMPLETED",
-
-&#x20;     "RAW\_INPUT",
-
-&#x20;     0,
-
-&#x20;     "0 eventi processati"
-
-&#x20;   );
+if (numRows <= 0 || startRow > lastRow) {
 
 
 
-&#x20;   return;
+&#x20; logEvent(
+
+&#x20;   "INPUT\_BATCH\_COMPLETED",
+
+&#x20;   "RAW\_INPUT",
+
+&#x20;   0,
+
+&#x20;   "0 eventi processati"
+
+&#x20; );
 
 
 
-&#x20; }
+&#x20; return;
+
+
+
+}
 
 
 
@@ -140,25 +144,63 @@ MAPPE PROGETTI / ENTITÀ (ottimizzato)
 
 
 
-&#x20; const projects = projectsSheet
+let projects = \[];
 
-&#x20;   .getRange(2,1,projectsSheet.getLastRow()-1,2)
+
+
+const projectsLastRow = projectsSheet.getLastRow();
+
+
+
+if (projectsLastRow > 1) {
+
+
+
+&#x20; projects = projectsSheet
+
+&#x20;   .getRange(2,1,projectsLastRow - 1,2)
 
 &#x20;   .getValues();
 
 
 
-&#x20; const entities = entitiesSheet
+}
 
-&#x20;   .getRange(2,1,entitiesSheet.getLastRow()-1,6)
+
+
+// SEMPRE fuori dall'if
+
+const projectMap = buildProjectMap(projects);
+
+
+
+let entities = \[];
+
+
+
+const entitiesLastRow = entitiesSheet.getLastRow();
+
+
+
+if (entitiesLastRow > 1) {
+
+
+
+&#x20; entities = entitiesSheet
+
+&#x20;   .getRange(2,1,entitiesLastRow - 1,6)
 
 &#x20;   .getValues();
 
 
 
-&#x20; const projectMap = buildProjectMap(projects);
+}
 
-&#x20; const entityMap = buildEntityMap(entities);
+
+
+// SEMPRE fuori dall'if
+
+const entityMap = buildEntityMap(entities);
 
 
 
@@ -222,7 +264,15 @@ PROCESSAMENTO CODA
 
 
 
-&#x20;   if (status !== "NEW") continue;
+// =====================================================
+
+// STATUS FILTER (NEW + ENTITY\_PENDING)
+
+// =====================================================
+
+
+
+if (status !== "NEW" \&\& status !== "ENTITY\_PENDING") continue;
 
 
 
@@ -308,35 +358,217 @@ RISOLUZIONE ENTITÀ
 
 
 
-&#x20;   const entityResult = entityResolutionEngine(event, entityMap);
+const entityResult = entityResolutionEngine(event, entityMap);
 
 
 
-&#x20;   if (entityResult.status !== "OK") {
+if (entityResult.status !== "OK") {
 
 
 
-&#x20;     logEvent(
+&#x20; // =====================================================
 
-&#x20;       "INPUT\_ENTITY\_PENDING",
+&#x20; // CASO 1 → NUOVO EVENTO (NEW)
 
-&#x20;       "RAW\_INPUT",
+&#x20; // =====================================================
 
-&#x20;       startRow + r,
-
-&#x20;       "Entità non trovata: " + event.soggetto
-
-&#x20;     );
+&#x20; if (status === "NEW") {
 
 
 
-&#x20;     statusUpdates.push(\[startRow + r, "ENTITY\_PENDING"]);
+&#x20;   logEvent(
 
-&#x20;     continue;
+&#x20;     "INPUT\_ENTITY\_PENDING",
+
+&#x20;     "RAW\_INPUT",
+
+&#x20;     startRow + r,
+
+&#x20;     "Entità non trovata: " + event.soggetto
+
+&#x20;   );
 
 
 
-&#x20;   }
+&#x20;   const entitySheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
+
+
+
+&#x20;   if (entitySheet) {
+
+
+
+&#x20;     const lastRowEntity = entitySheet.getLastRow();
+
+
+
+&#x20;     let existing = \[];
+
+
+
+&#x20;     if (lastRowEntity > 1) {
+
+&#x20;       existing = entitySheet
+
+&#x20;         .getRange(2, 1, lastRowEntity - 1, 1)
+
+&#x20;         .getValues();
+
+&#x20;     }
+
+
+
+&#x20;     const inputTextRaw = event.soggetto || "";
+
+&#x20;     const inputText = inputTextRaw.toString().trim();
+
+&#x20;     const inputKey = inputText.toLowerCase();
+
+
+
+&#x20;     let alreadyExists = false;
+
+
+
+&#x20;     for (let i = 0; i < existing.length; i++) {
+
+
+
+&#x20;       const existingText = (existing\[i]\[0] || "")
+
+&#x20;         .toString()
+
+&#x20;         .trim()
+
+&#x20;         .toLowerCase();
+
+
+
+&#x20;       if (existingText === inputKey) {
+
+&#x20;         alreadyExists = true;
+
+&#x20;         break;
+
+&#x20;       }
+
+
+
+&#x20;     }
+
+
+
+&#x20;     if (!alreadyExists \&\& inputText !== "") {
+
+
+
+&#x20;       let suggestedName = "";
+
+&#x20;       let suggestedId = "";
+
+
+
+&#x20;       if (entityMap\[inputKey]) {
+
+
+
+&#x20;         suggestedName = inputText;
+
+&#x20;         suggestedId = entityMap\[inputKey];
+
+
+
+&#x20;       } else {
+
+
+
+&#x20;         for (let key in entityMap) {
+
+
+
+&#x20;           if (
+
+&#x20;             key.includes(inputKey) ||
+
+&#x20;             inputKey.includes(key)
+
+&#x20;           ) {
+
+
+
+&#x20;             suggestedName = key;
+
+&#x20;             suggestedId = entityMap\[key];
+
+&#x20;             break;
+
+
+
+&#x20;           }
+
+
+
+&#x20;         }
+
+
+
+&#x20;       }
+
+
+
+&#x20;       entitySheet.appendRow(\[
+
+&#x20;         inputText,
+
+&#x20;         suggestedName,
+
+&#x20;         suggestedId,
+
+&#x20;         "",
+
+&#x20;         "",
+
+&#x20;         new Date(),
+
+&#x20;         suggestedId ? "SUGGESTED" : "PENDING"
+
+&#x20;       ]);
+
+
+
+&#x20;     }
+
+
+
+&#x20;   } // 
+
+
+
+&#x20;   statusUpdates.push(\[startRow + r, "ENTITY\_PENDING"]);
+
+&#x20;   continue;
+
+
+
+&#x20; }
+
+
+
+&#x20; // =====================================================
+
+&#x20; // CASO 2 → GIÀ ENTITY\_PENDING
+
+&#x20; // =====================================================
+
+&#x20; if (status === "ENTITY\_PENDING") {
+
+&#x20;   continue;
+
+&#x20; }
+
+
+
+}
 
 
 
@@ -570,7 +802,7 @@ AGGIORNAMENTO CURSORE
 
 
 
-&#x20; props.setProperty("LOGOS\_QUEUE\_CURSOR", lastRow);
+&#x20; //props.setProperty("LOGOS\_QUEUE\_CURSOR", lastRow);
 
 
 
