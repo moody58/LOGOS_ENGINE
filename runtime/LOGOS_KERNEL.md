@@ -18,8 +18,6 @@ Ecosystem: AIOS
 
 SYSTEM LOG
 
-Scrive eventi nel foglio SYSTEM\_LOG
-
 ===================================================== \*/
 
 
@@ -66,15 +64,9 @@ function logEvent(eventType, sheetName, row, details) {
 
 
 
-
-
 /\* =====================================================
 
-INPUT TRIGGER
-
-Attiva automaticamente il processor quando viene
-
-inserito un nuovo evento nella coda RAW\_INPUT
+INPUT TRIGGER (UNICA AUTORITÀ PROCESSOR)
 
 ===================================================== \*/
 
@@ -128,8 +120,6 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20;   processRawInputV2();
 
-
-
 &#x20; }
 
 
@@ -140,13 +130,9 @@ function LOGOS\_inputTrigger(e) {
 
 
 
-
-
 /\* =====================================================
 
 ON EDIT CORE HANDLER
-
-Gestisce tutte le automazioni del sistema
 
 ===================================================== \*/
 
@@ -160,31 +146,37 @@ function onEdit(e) {
 
 
 
-&#x20; /\* ---- attivazione trigger ingestione ---- \*/
-
-
-
-&#x20; LOGOS\_inputTrigger(e);
-
-
-
 &#x20; const sheet = e.range.getSheet();
 
 &#x20; const sheetName = sheet.getName();
 
 &#x20; const row = e.range.getRow();
 
-&#x20; const col = e.range.getColumn();
-
-&#x20; const props = PropertiesService.getDocumentProperties();
-
-&#x20; const ss = e.source;
-
 
 
 &#x20; if (row === 1) return;
 
 
+
+&#x20; /\* ---- TRIGGER PROCESSOR (ISOLATO) ---- \*/
+
+
+
+&#x20; if (sheetName === "RAW\_INPUT") {
+
+&#x20;   LOGOS\_inputTrigger(e);
+
+&#x20;   return;
+
+&#x20; }
+
+
+
+&#x20; const col = e.range.getColumn();
+
+&#x20; const props = PropertiesService.getDocumentProperties();
+
+&#x20; const ss = e.source;
 
 
 
@@ -254,11 +246,7 @@ PROTEZIONE CHIAVI PRIMARIE
 
 &#x20;   return;
 
-
-
 &#x20; }
-
-
 
 
 
@@ -266,7 +254,7 @@ PROTEZIONE CHIAVI PRIMARIE
 
 /\* =====================================================
 
-RAW\_DATA — CREAZIONE MOVIMENTO
+RAW\_DATA — ENTITY CONFIRMATION (SOLO LOGICA, NO ID)
 
 ===================================================== \*/
 
@@ -276,93 +264,9 @@ RAW\_DATA — CREAZIONE MOVIMENTO
 
 
 
-&#x20;   const idColumn = 1;
-
-&#x20;   const timestampColumn = 2;
-
-&#x20;   const projectColumn = 5;
-
 &#x20;   const entityInputColumn = 4;
 
 &#x20;   const entityIdColumn = 6;
-
-
-
-&#x20;   const idCell = sheet.getRange(row, idColumn);
-
-&#x20;   const timestampCell = sheet.getRange(row, timestampColumn);
-
-
-
-
-
-
-
-/\* ---- Generazione ID movimento ---- \*/
-
-
-
-&#x20;   if (col === projectColumn \&\& e.value) {
-
-
-
-&#x20;     if (!timestampCell.getValue()) {
-
-
-
-&#x20;       let lastNumber = parseInt(props.getProperty("LAST\_MOV\_NUMBER")) || 0;
-
-
-
-&#x20;       const nextNumber = lastNumber + 1;
-
-
-
-&#x20;       props.setProperty("LAST\_MOV\_NUMBER", nextNumber);
-
-
-
-&#x20;       const newId = "MOV\_" + String(nextNumber).padStart(6, "0");
-
-
-
-&#x20;       timestampCell.setValue(new Date());
-
-&#x20;       idCell.setValue(newId);
-
-
-
-&#x20;       logEvent(
-
-&#x20;         "NEW\_MOVEMENT",
-
-&#x20;         sheetName,
-
-&#x20;         row,
-
-&#x20;         "Creato " + newId
-
-&#x20;       );
-
-
-
-&#x20;     }
-
-
-
-&#x20;   }
-
-
-
-
-
-
-
-/\* =====================================================
-
-ENTITY CONFIRMATION
-
-===================================================== \*/
 
 
 
@@ -442,19 +346,43 @@ ENTITY CONFIRMATION
 
 &#x20;       );
 
-
-
 &#x20;     }
 
-
-
 &#x20;   }
-
-
 
 &#x20; }
 
 
+
+
+
+/\* =====================================================
+
+ENTITY\_CONFIRMATION — COMMIT ENTITY
+
+===================================================== \*/
+
+
+
+&#x20; if (sheetName === "ENTITY\_CONFIRMATION") {
+
+
+
+&#x20;   if (col !== 4 || row < 2) return;
+
+
+
+&#x20;   const value = (e.value || "").toString().trim();
+
+&#x20;   if (value !== "Confirm") return;
+
+
+
+&#x20;   LOGOS\_commitSingleEntity(row);
+
+&#x20;   return;
+
+&#x20; }
 
 
 
@@ -498,8 +426,6 @@ PROJECTS — CREAZIONE PROGETTO
 
 &#x20;       let lastProject = parseInt(props.getProperty("LAST\_PRJ\_NUMBER")) || 0;
 
-
-
 &#x20;       const nextProject = lastProject + 1;
 
 
@@ -518,33 +444,11 @@ PROJECTS — CREAZIONE PROGETTO
 
 
 
-&#x20;       logEvent(
-
-&#x20;         "PROJECT\_CREATED",
-
-&#x20;         sheetName,
-
-&#x20;         row,
-
-&#x20;         newProjectId
-
-&#x20;       );
-
-
+&#x20;       logEvent("PROJECT\_CREATED", sheetName, row, newProjectId);
 
 &#x20;     }
 
-
-
 &#x20;   }
-
-
-
-
-
-
-
-/\* ---- Blocco auto-parent ---- \*/
 
 
 
@@ -554,11 +458,9 @@ PROJECTS — CREAZIONE PROGETTO
 
 &#x20;     const currentId = sheet.getRange(row, idColumn).getValue();
 
-&#x20;     const parentValue = e.value;
 
 
-
-&#x20;     if (currentId \&\& parentValue === currentId) {
+&#x20;     if (currentId \&\& e.value === currentId) {
 
 
 
@@ -578,27 +480,11 @@ PROJECTS — CREAZIONE PROGETTO
 
 
 
-&#x20;       logEvent(
-
-&#x20;         "PROJECT\_HIERARCHY\_ERROR",
-
-&#x20;         sheetName,
-
-&#x20;         row,
-
-&#x20;         "Auto-parent"
-
-&#x20;       );
-
-
+&#x20;       logEvent("PROJECT\_HIERARCHY\_ERROR", sheetName, row, "Auto-parent");
 
 &#x20;     }
 
-
-
 &#x20;   }
-
-
 
 &#x20; }
 
@@ -606,11 +492,9 @@ PROJECTS — CREAZIONE PROGETTO
 
 
 
-
-
 /\* =====================================================
 
-ENTITIES — CREAZIONE ENTITÀ
+ENTITIES — METADATA (NO ID GENERATION)
 
 ===================================================== \*/
 
@@ -622,8 +506,6 @@ ENTITIES — CREAZIONE ENTITÀ
 
 &#x20;   const idColumn = 1;
 
-&#x20;   const typeColumn = 2;
-
 &#x20;   const parentColumn = 14;
 
 &#x20;   const createdColumn = 15;
@@ -634,73 +516,11 @@ ENTITIES — CREAZIONE ENTITÀ
 
 &#x20;   const idCell = sheet.getRange(row, idColumn);
 
-&#x20;   const createdCell = sheet.getRange(row, createdColumn);
-
 &#x20;   const modifiedCell = sheet.getRange(row, modifiedColumn);
 
 
 
-
-
-
-
-/\* ---- Generazione ID entità ---- \*/
-
-
-
-&#x20;   if (col === typeColumn \&\& e.value \&\& !idCell.getValue()) {
-
-
-
-&#x20;     let lastEntity = parseInt(props.getProperty("LAST\_ENT\_NUMBER")) || 0;
-
-
-
-&#x20;     const nextEntity = lastEntity + 1;
-
-
-
-&#x20;     props.setProperty("LAST\_ENT\_NUMBER", nextEntity);
-
-
-
-&#x20;     const newEntityId = "ENT\_" + String(nextEntity).padStart(6, "0");
-
-
-
-&#x20;     idCell.setValue(newEntityId);
-
-&#x20;     createdCell.setValue(new Date());
-
-
-
-&#x20;     logEvent(
-
-&#x20;       "ENTITY\_CREATED",
-
-&#x20;       sheetName,
-
-&#x20;       row,
-
-&#x20;       newEntityId
-
-&#x20;     );
-
-
-
-&#x20;     return;
-
-
-
-&#x20;   }
-
-
-
-
-
-
-
-/\* ---- Blocco auto-parent ---- \*/
+&#x20;   /\* ---- BLOCCO AUTO-PARENT ---- \*/
 
 
 
@@ -710,11 +530,9 @@ ENTITIES — CREAZIONE ENTITÀ
 
 &#x20;     const currentId = idCell.getValue();
 
-&#x20;     const parentValue = e.value;
 
 
-
-&#x20;     if (currentId \&\& parentValue === currentId) {
+&#x20;     if (currentId \&\& e.value === currentId) {
 
 
 
@@ -734,37 +552,17 @@ ENTITIES — CREAZIONE ENTITÀ
 
 
 
-&#x20;       logEvent(
-
-&#x20;         "ENTITY\_HIERARCHY\_ERROR",
-
-&#x20;         sheetName,
-
-&#x20;         row,
-
-&#x20;         "Auto-parent"
-
-&#x20;       );
-
-
+&#x20;       logEvent("ENTITY\_HIERARCHY\_ERROR", sheetName, row, "Auto-parent");
 
 &#x20;       return;
 
-
-
 &#x20;     }
-
-
 
 &#x20;   }
 
 
 
-
-
-
-
-/\* ---- Timestamp modifica ---- \*/
+&#x20;   /\* ---- TIMESTAMP MODIFICA ---- \*/
 
 
 
@@ -780,15 +578,9 @@ ENTITIES — CREAZIONE ENTITÀ
 
 &#x20;   ) {
 
-
-
 &#x20;     modifiedCell.setValue(new Date());
 
-
-
 &#x20;   }
-
-
 
 &#x20; }
 
