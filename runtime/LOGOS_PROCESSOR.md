@@ -308,6 +308,42 @@ if (status !== "NEW" \&\& status !== "ENTITY\_PENDING") continue;
 
 
 
+// =====================================================
+
+// NORMALIZATION LAYER (NON DISTRUTTIVO)
+
+// =====================================================
+
+
+
+const normalizedEvent = normalizeEvent({
+
+&#x20; project\_name: event.projectName,
+
+&#x20; tipo: event.tipo,
+
+&#x20; valore: event.valore,
+
+&#x20; data\_evento: event.dataEvento,
+
+&#x20; causale: event.causale,
+
+&#x20; riferimento: event.riferimento,
+
+&#x20; metodo\_pagamento: event.metodoPagamento,
+
+&#x20; note: event.note,
+
+&#x20; soggetto: event.soggetto,
+
+&#x20; source: event.source
+
+});
+
+
+
+
+
 /\* =====================================================
 
 VALIDAZIONE PROGETTO
@@ -316,7 +352,7 @@ VALIDAZIONE PROGETTO
 
 
 
-&#x20;   const validation = validationEngine(event, projectMap);
+&#x20;   const validation = validationEngine(normalizedEvent, projectMap);
 
 
 
@@ -358,7 +394,7 @@ RISOLUZIONE ENTITÀ
 
 
 
-const entityResult = entityResolutionEngine(event, entityMap);
+const entityResult = entityResolutionEngine(normalizedEvent, entityMap);
 
 
 
@@ -838,7 +874,7 @@ VALIDATION ENGINE
 
 
 
-function validationEngine(event, projectMap) {
+function validationEngine(normalizedEvent, projectMap) {
 
 
 
@@ -882,7 +918,7 @@ ENTITY RESOLUTION ENGINE
 
 
 
-function entityResolutionEngine(event, entityMap) {
+function entityResolutionEngine(normalizedEvent, entityMap) {
 
 
 
@@ -1036,7 +1072,7 @@ EVENT FINGERPRINT
 
 
 
-function generateEventFingerprint(event, projectId, entityId) {
+function generateEventFingerprint(normalizedEvent, projectId, entityId) {
 
 
 
@@ -1103,6 +1139,378 @@ function LOGOS\_generateMovementID() {
 &#x20; return newId;
 
 
+
+}
+
+
+
+/\* =====================================================
+
+NORMALIZATION ENGINE
+
+Layer non distruttivo — standardizza input utente
+
+Lingua: ITA
+
+Gestione: valori, tempo, unità
+
+===================================================== \*/
+
+
+
+function normalizeEvent(row) {
+
+
+
+&#x20; return {
+
+
+
+&#x20;   projectName: (row.project\_name || "").toString().trim(),
+
+
+
+&#x20;   tipo: normalizeTipo(row.tipo),
+
+
+
+&#x20;   valore: normalizeValore(row.valore),
+
+
+
+&#x20;   dataEvento: normalizeData(row.data\_evento),
+
+
+
+&#x20;   causale: (row.causale || "").toString().trim(),
+
+
+
+&#x20;   riferimento: (row.riferimento || "").toString().trim(),
+
+
+
+&#x20;   metodoPagamento: normalizeMetodo(row.metodo\_pagamento),
+
+
+
+&#x20;   note: (row.note || "").toString().trim(),
+
+
+
+&#x20;   soggetto: (row.soggetto || "").toString().trim(),
+
+
+
+&#x20;   soggetto\_normalized: (row.soggetto || "")
+
+&#x20;     .toString()
+
+&#x20;     .trim()
+
+&#x20;     .toLowerCase(),
+
+
+
+&#x20;   source: row.source || "UNKNOWN"
+
+&#x20; };
+
+}
+
+
+
+
+
+/\* =====================================================
+
+TIPO MOVIMENTO
+
+===================================================== \*/
+
+
+
+function normalizeTipo(tipo) {
+
+
+
+&#x20; const t = (tipo || "").toString().toLowerCase();
+
+
+
+&#x20; if (t.includes("spesa") || t.includes("uscita")) return "SPESA";
+
+
+
+&#x20; if (t.includes("entrata") || t.includes("incasso")) return "ENTRATA";
+
+
+
+&#x20; if (t.includes("trasferimento")) return "TRASFERIMENTO";
+
+
+
+&#x20; return "ALTRO";
+
+}
+
+
+
+
+
+/\* =====================================================
+
+VALORE + UNITÀ
+
+Gestisce:
+
+\- €
+
+\- numeri con virgola
+
+\- tempo (ore)
+
+\- quantità base
+
+===================================================== \*/
+
+
+
+function normalizeValore(val) {
+
+
+
+&#x20; if (!val) return 0;
+
+
+
+&#x20; let raw = val.toString().toLowerCase().trim();
+
+
+
+&#x20; // ========================
+
+&#x20; // TEMPO (ore)
+
+&#x20; // ========================
+
+
+
+&#x20; if (
+
+&#x20;   raw.includes("h") ||
+
+&#x20;   raw.includes("ora") ||
+
+&#x20;   raw.includes("ore")
+
+&#x20; ) {
+
+&#x20;   return normalizeTimeToHours(raw);
+
+&#x20; }
+
+
+
+&#x20; // ========================
+
+&#x20; // VALUTA
+
+&#x20; // ========================
+
+
+
+&#x20; raw = raw.replace("€","").replace(",",".").trim();
+
+
+
+&#x20; const num = parseFloat(raw);
+
+
+
+&#x20; return isNaN(num) ? 0 : num;
+
+}
+
+
+
+
+
+/\* =====================================================
+
+DATA
+
+===================================================== \*/
+
+
+
+function normalizeData(d) {
+
+
+
+&#x20; if (!d) return new Date();
+
+
+
+&#x20; const date = new Date(d);
+
+
+
+&#x20; if (isNaN(date)) return new Date();
+
+
+
+&#x20; return date;
+
+}
+
+
+
+
+
+/\* =====================================================
+
+METODO PAGAMENTO
+
+===================================================== \*/
+
+
+
+function normalizeMetodo(m) {
+
+
+
+&#x20; const val = (m || "").toString().toLowerCase();
+
+
+
+&#x20; if (val.includes("contanti") || val.includes("cash")) return "CONTANTI";
+
+
+
+&#x20; if (val.includes("carta") || val.includes("card")) return "CARTA";
+
+
+
+&#x20; if (val.includes("bonifico")) return "BONIFICO";
+
+
+
+&#x20; if (val.includes("paypal")) return "PAYPAL";
+
+
+
+&#x20; return "ALTRO";
+
+}
+
+
+
+
+
+/\* =====================================================
+
+TEMPO → ORE DECIMALI
+
+Gestisce:
+
+\- 1.5h
+
+\- 1h 30m
+
+\- 1 ora e 30 minuti
+
+\- 90 min
+
+===================================================== \*/
+
+
+
+function normalizeTimeToHours(input) {
+
+
+
+&#x20; let str = input.toLowerCase().trim();
+
+
+
+&#x20; let hours = 0;
+
+&#x20; let minutes = 0;
+
+
+
+&#x20; // 1h 30m
+
+&#x20; const hMatch = str.match(/(\\d+(?:\[.,]\\d+)?)\\s\*h/);
+
+&#x20; const mMatch = str.match(/(\\d+)\\s\*m/);
+
+
+
+&#x20; if (hMatch) {
+
+&#x20;   hours += parseFloat(hMatch\[1].replace(",", "."));
+
+&#x20; }
+
+
+
+&#x20; if (mMatch) {
+
+&#x20;   minutes += parseInt(mMatch\[1]);
+
+&#x20; }
+
+
+
+&#x20; // formato: 1 ora 30 minuti
+
+&#x20; const oraMatch = str.match(/(\\d+)\\s\*ora/);
+
+&#x20; const minutiMatch = str.match(/(\\d+)\\s\*min/);
+
+
+
+&#x20; if (oraMatch) {
+
+&#x20;   hours += parseInt(oraMatch\[1]);
+
+&#x20; }
+
+
+
+&#x20; if (minutiMatch) {
+
+&#x20;   minutes += parseInt(minutiMatch\[1]);
+
+&#x20; }
+
+
+
+&#x20; // formato: 90 min
+
+&#x20; if (!hMatch \&\& minutiMatch) {
+
+&#x20;   minutes = parseInt(minutiMatch\[1]);
+
+&#x20; }
+
+
+
+&#x20; // formato: 1.5h
+
+&#x20; const decimalMatch = str.match(/(\\d+\[.,]\\d+)/);
+
+&#x20; if (decimalMatch \&\& str.includes("h")) {
+
+&#x20;   return parseFloat(decimalMatch\[1].replace(",", "."));
+
+&#x20; }
+
+
+
+&#x20; return hours + (minutes / 60);
 
 }
 
