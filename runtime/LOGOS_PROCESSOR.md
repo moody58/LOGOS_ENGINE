@@ -402,12 +402,6 @@ if (entityResult.status !== "OK") {
 
 
 
-&#x20; // =====================================================
-
-&#x20; // CASO 1 → NUOVO EVENTO (NEW)
-
-&#x20; // =====================================================
-
 &#x20; if (status === "NEW") {
 
 
@@ -420,7 +414,7 @@ if (entityResult.status !== "OK") {
 
 &#x20;     startRow + r,
 
-&#x20;     "Entità non trovata: " + event.soggetto
+&#x20;     "Entità non trovata: " + normalizedEvent.soggetto
 
 &#x20;   );
 
@@ -454,9 +448,7 @@ if (entityResult.status !== "OK") {
 
 
 
-&#x20;     const inputTextRaw = event.soggetto || "";
-
-&#x20;     const inputText = inputTextRaw.toString().trim();
+&#x20;     const inputText = (normalizedEvent.soggetto || "").toString().trim();
 
 &#x20;     const inputKey = inputText.toLowerCase();
 
@@ -467,8 +459,6 @@ if (entityResult.status !== "OK") {
 
 
 &#x20;     for (let i = 0; i < existing.length; i++) {
-
-
 
 &#x20;       const existingText = (existing\[i]\[0] || "")
 
@@ -488,8 +478,6 @@ if (entityResult.status !== "OK") {
 
 &#x20;       }
 
-
-
 &#x20;     }
 
 
@@ -504,49 +492,15 @@ if (entityResult.status !== "OK") {
 
 
 
-&#x20;       if (entityMap\[inputKey]) {
+&#x20;       const suggestions = suggestEntity(inputText, entityMap);
 
 
 
-&#x20;         suggestedName = inputText;
+&#x20;       if (suggestions \&\& suggestions.length > 0) {
 
-&#x20;         suggestedId = entityMap\[inputKey];
+&#x20;         suggestedName = suggestions\[0].name;
 
-
-
-&#x20;       } else {
-
-
-
-&#x20;         for (let key in entityMap) {
-
-
-
-&#x20;           if (
-
-&#x20;             key.includes(inputKey) ||
-
-&#x20;             inputKey.includes(key)
-
-&#x20;           ) {
-
-
-
-&#x20;             suggestedName = key;
-
-&#x20;             suggestedId = entityMap\[key];
-
-&#x20;             break;
-
-
-
-&#x20;           }
-
-
-
-&#x20;         }
-
-
+&#x20;         suggestedId = suggestions\[0].id;
 
 &#x20;       }
 
@@ -570,13 +524,9 @@ if (entityResult.status !== "OK") {
 
 &#x20;       ]);
 
-
-
 &#x20;     }
 
-
-
-&#x20;   } // 
+&#x20;   }
 
 
 
@@ -584,17 +534,9 @@ if (entityResult.status !== "OK") {
 
 &#x20;   continue;
 
-
-
 &#x20; }
 
 
-
-&#x20; // =====================================================
-
-&#x20; // CASO 2 → GIÀ ENTITY\_PENDING
-
-&#x20; // =====================================================
 
 &#x20; if (status === "ENTITY\_PENDING") {
 
@@ -602,11 +544,7 @@ if (entityResult.status !== "OK") {
 
 &#x20; }
 
-
-
 }
-
-
 
 
 
@@ -620,7 +558,7 @@ FINGERPRINT EVENTO
 
 &#x20;   const fingerprint = generateEventFingerprint(
 
-&#x20;     event,
+&#x20;     normalizedEvent,
 
 &#x20;     validation.projectId,
 
@@ -666,49 +604,49 @@ FINGERPRINT EVENTO
 
 /\* =====================================================
 
-BUFFER LEDGER
+BUFFER LEDGER (NORMALIZED DATA ONLY)
 
 ===================================================== \*/
 
 
 
-&#x20;   ledgerBuffer.push(\[
+ledgerBuffer.push(\[
 
 
 
-&#x20;     LOGOS\_generateMovementID(),
+&#x20; LOGOS\_generateMovementID(),
 
-&#x20;     new Date(),
+&#x20; new Date(),
 
-&#x20;     event.dataEvento,
+&#x20; normalizedEvent.dataEvento,
 
-&#x20;     event.soggetto,
+&#x20; normalizedEvent.soggetto,
 
-&#x20;     validation.projectId,
+&#x20; validation.projectId,
 
-&#x20;     entityResult.entityId,
+&#x20; entityResult.entityId,
 
-&#x20;     event.tipo,
+&#x20; normalizedEvent.tipo,
 
-&#x20;     event.valore,
+&#x20; normalizedEvent.valore,
 
-&#x20;     "",
+&#x20; "",
 
-&#x20;     event.causale,
+&#x20; normalizedEvent.causale,
 
-&#x20;     "",
+&#x20; "",
 
-&#x20;     event.riferimento,
+&#x20; normalizedEvent.riferimento,
 
-&#x20;     event.source,
+&#x20; normalizedEvent.source,
 
-&#x20;     event.metodoPagamento,
+&#x20; normalizedEvent.metodoPagamento,
 
-&#x20;     event.note
+&#x20; normalizedEvent.note
 
 
 
-&#x20;   ]);
+]);
 
 
 
@@ -878,9 +816,9 @@ function validationEngine(normalizedEvent, projectMap) {
 
 
 
-&#x20; const key = event.projectName
+&#x20; const key = normalizedEvent.projectName
 
-&#x20;   ? event.projectName.toString().trim().toLowerCase()
+&#x20;   ? normalizedEvent.projectName.toString().trim().toLowerCase()
 
 &#x20;   : "";
 
@@ -922,9 +860,9 @@ function entityResolutionEngine(normalizedEvent, entityMap) {
 
 
 
-&#x20; const key = event.soggetto
+&#x20; const key = normalizedEvent.soggetto
 
-&#x20;   ? event.soggetto.toString().trim().toLowerCase()
+&#x20;   ? normalizedEvent.soggetto.toString().trim().toLowerCase()
 
 &#x20;   : "";
 
@@ -1082,15 +1020,15 @@ function generateEventFingerprint(normalizedEvent, projectId, entityId) {
 
 &#x20;   entityId,
 
-&#x20;   event.dataEvento,
+&#x20;   normalizedEvent.dataEvento,
 
-&#x20;   event.tipo,
+&#x20;   normalizedEvent.tipo,
 
-&#x20;   event.valore,
+&#x20;   normalizedEvent.valore,
 
-&#x20;   event.causale,
+&#x20;   normalizedEvent.causale,
 
-&#x20;   event.source
+&#x20;   normalizedEvent.source
 
 &#x20; ].join("|");
 
@@ -1511,6 +1449,158 @@ function normalizeTimeToHours(input) {
 
 
 &#x20; return hours + (minutes / 60);
+
+}
+
+
+
+/\* =====================================================
+
+ENTITY SUGGESTION ENGINE v2 (RANKED)
+
+===================================================== \*/
+
+
+
+function suggestEntity(input, entityMap) {
+
+
+
+&#x20; const inputNorm = normalizeText(input);
+
+
+
+&#x20; let results = \[];
+
+
+
+&#x20; for (let key in entityMap) {
+
+
+
+&#x20;   const score = similarityScore(inputNorm, key);
+
+
+
+&#x20;   if (score > 0.4) { // soglia bassa per ranking
+
+&#x20;     results.push({
+
+&#x20;       name: key,
+
+&#x20;       id: entityMap\[key],
+
+&#x20;       score: score
+
+&#x20;     });
+
+&#x20;   }
+
+&#x20; }
+
+
+
+&#x20; // ordina per score decrescente
+
+&#x20; results.sort((a, b) => b.score - a.score);
+
+
+
+&#x20; // ritorna top 3
+
+&#x20; if (results.length > 0) {
+
+&#x20;   return results.slice(0, 3);
+
+&#x20; }
+
+
+
+&#x20; return null;
+
+}
+
+
+
+/\* =====================================================
+
+NORMALIZZAZIONE TESTO
+
+===================================================== \*/
+
+
+
+function normalizeText(text) {
+
+
+
+&#x20; return (text || "")
+
+&#x20;   .toString()
+
+&#x20;   .toLowerCase()
+
+&#x20;   .trim()
+
+&#x20;   .replace(/\\s+/g, " ");
+
+}
+
+
+
+
+
+/\* =====================================================
+
+SIMILARITÀ STRINGHE (SEMPLICE)
+
+===================================================== \*/
+
+
+
+function similarityScore(a, b) {
+
+
+
+&#x20; if (!a || !b) return 0;
+
+
+
+&#x20; if (a === b) return 1;
+
+
+
+&#x20; // contains boost
+
+&#x20; if (a.includes(b) || b.includes(a)) return 0.8;
+
+
+
+&#x20; // parola in comune
+
+&#x20; const aParts = a.split(" ");
+
+&#x20; const bParts = b.split(" ");
+
+
+
+&#x20; let matches = 0;
+
+
+
+&#x20; aParts.forEach(word => {
+
+&#x20;   if (bParts.includes(word)) matches++;
+
+&#x20; });
+
+
+
+&#x20; const score = matches / Math.max(aParts.length, bParts.length);
+
+
+
+&#x20; return score;
 
 }
 
