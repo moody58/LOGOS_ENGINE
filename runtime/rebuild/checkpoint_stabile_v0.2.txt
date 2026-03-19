@@ -1,0 +1,29 @@
+LOGOS — CHECKPOINT STABILE v0.2
+
+PIPELINE:
+INGESTION → RAW_INPUT → PROCESSOR → RAW_DATA
+
+PROCESSOR:
+- batch write ✔
+- entity cache ✔
+- status normalization ✔
+- incomplete detection ✔
+- timestamp processing ✔
+
+ENTITY FLOW:
+- NEW → ENTITY_PENDING → CONFIRM → WRITTEN
+
+COMPORTAMENTO:
+- veloce ✔
+- no duplicati entity ✔
+- reprocess automatico ✔
+
+DATA QUALITY:
+- INCOMPLETE gestito ✔
+
+LIMITI:
+- deduplicazione eventi assente
+- nessun controllo su doppio inserimento RAW_DATA
+
+STATO:
+BASE SOLIDA — PRONTA PER HARDENING
