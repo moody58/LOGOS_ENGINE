@@ -2,13 +2,11 @@
 
 LOGOS ENGINE — INPUT PROCESSOR
 
-Versione: v1.8 (FIXED STABLE)
+Versione: v1.8 FINAL STABLE
 
 Pipeline: RAW\_INPUT → PROCESSOR → RAW\_DATA
 
 \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-
-
 
 
 
@@ -44,16 +42,6 @@ function processRawInputV2() {
 
 
 
-
-
-/\* =====================================================
-
-QUEUE
-
-===================================================== \*/
-
-
-
 &#x20; const lastRow = inputSheet.getLastRow();
 
 &#x20; const lastCol = inputSheet.getLastColumn();
@@ -80,16 +68,6 @@ QUEUE
 
 
 
-
-
-/\* =====================================================
-
-HEADER
-
-===================================================== \*/
-
-
-
 &#x20; const headers = inputSheet.getRange(1,1,1,lastCol).getValues()\[0];
 
 &#x20; const inputData = inputSheet.getRange(startRow,1,numRows,lastCol).getValues();
@@ -102,23 +80,23 @@ HEADER
 
 
 
-
-
-/\* =====================================================
-
-MAPPE
-
-===================================================== \*/
+&#x20; /\* ================= MAPPE ================= \*/
 
 
 
 &#x20; let projects = \[];
 
-&#x20; if (projectsSheet.getLastRow() > 1) {
+&#x20; const projectsLastRow = projectsSheet.getLastRow();
 
-&#x20;   projects = projectsSheet.getRange(2,1,projectsSheet.getLastRow()-1,2).getValues();
+
+
+&#x20; if (projectsLastRow > 1) {
+
+&#x20;   projects = projectsSheet.getRange(2,1,projectsLastRow - 1,2).getValues();
 
 &#x20; }
+
+
 
 &#x20; const projectMap = buildProjectMap(projects);
 
@@ -126,23 +104,23 @@ MAPPE
 
 &#x20; let entities = \[];
 
-&#x20; if (entitiesSheet.getLastRow() > 1) {
+&#x20; const entitiesLastRow = entitiesSheet.getLastRow();
 
-&#x20;   entities = entitiesSheet.getRange(2,1,entitiesSheet.getLastRow()-1,6).getValues();
+
+
+&#x20; if (entitiesLastRow > 1) {
+
+&#x20;   entities = entitiesSheet.getRange(2,1,entitiesLastRow - 1,6).getValues();
 
 &#x20; }
+
+
 
 &#x20; const entityMap = buildEntityMap(entities);
 
 
 
-
-
-/\* =====================================================
-
-BUFFER
-
-===================================================== \*/
+&#x20; /\* ================= BUFFER ================= \*/
 
 
 
@@ -154,13 +132,7 @@ BUFFER
 
 
 
-
-
-/\* =====================================================
-
-LOOP
-
-===================================================== \*/
+&#x20; /\* ================= LOOP ================= \*/
 
 
 
@@ -210,16 +182,6 @@ LOOP
 
 
 
-
-
-/\* =====================================================
-
-NORMALIZE
-
-===================================================== \*/
-
-
-
 &#x20;   const normalizedEvent = normalizeEvent({
 
 &#x20;     project\_name: event.projectName,
@@ -246,13 +208,7 @@ NORMALIZE
 
 
 
-
-
-/\* =====================================================
-
-VALIDATION
-
-===================================================== \*/
+&#x20;   /\* ================= VALIDAZIONE ================= \*/
 
 
 
@@ -262,13 +218,9 @@ VALIDATION
 
 &#x20;   if (!validation.valid) {
 
+&#x20;     logEvent("INPUT\_ERROR\_PROJECT","RAW\_INPUT",startRow + r,"Progetto non trovato: " + event.projectName);
 
-
-&#x20;     logEvent("INPUT\_ERROR\_PROJECT","RAW\_INPUT",startRow+r,"Progetto non trovato");
-
-
-
-&#x20;     statusUpdates.push(\[startRow+r,"ERROR\_PROJECT"]);
+&#x20;     statusUpdates.push(\[startRow + r, "ERROR\_PROJECT"]);
 
 &#x20;     continue;
 
@@ -276,13 +228,25 @@ VALIDATION
 
 
 
+&#x20;   /\* ================= ENTITY RESOLUTION ================= \*/
 
 
-/\* =====================================================
 
-ENTITY RESOLUTION + AUTO MATCH
+&#x20;   const inputText = (normalizedEvent.soggetto || "").toString().trim();
 
-===================================================== \*/
+&#x20;   const inputKey = inputText.toLowerCase();
+
+
+
+&#x20;   let suggestions = null;
+
+
+
+&#x20;   if (inputText) {
+
+&#x20;     suggestions = suggestEntity(inputText, entityMap);
+
+&#x20;   }
 
 
 
@@ -290,53 +254,43 @@ ENTITY RESOLUTION + AUTO MATCH
 
 
 
-&#x20;   const inputText = (normalizedEvent.soggetto || "").toString().trim();
+&#x20;   /\* ---- AUTO MATCH ---- \*/
 
 
 
-&#x20;   if (entityResult.status !== "OK" \&\& inputText) {
+&#x20;   if (entityResult.status !== "OK" \&\& suggestions \&\& suggestions.length > 0) {
 
 
 
-&#x20;     const suggestions = suggestEntity(inputText, entityMap);
+&#x20;     const bestMatch = suggestions\[0];
 
 
 
-&#x20;     if (suggestions \&\& suggestions.length > 0) {
+&#x20;     if (bestMatch.score >= 0.85) {
 
 
 
-&#x20;       const bestMatch = suggestions\[0];
+&#x20;       entityResult = {
+
+&#x20;         status: "OK",
+
+&#x20;         entityId: bestMatch.id
+
+&#x20;       };
 
 
 
-&#x20;       if (bestMatch.score >= 0.85) {
+&#x20;       logEvent(
 
+&#x20;         "ENTITY\_AUTO\_MATCH",
 
+&#x20;         "RAW\_INPUT",
 
-&#x20;         entityResult = {
+&#x20;         startRow + r,
 
-&#x20;           status: "OK",
+&#x20;         "Match automatico: " + inputText + " → " + bestMatch.name
 
-&#x20;           entityId: bestMatch.id
-
-&#x20;         };
-
-
-
-&#x20;         logEvent(
-
-&#x20;           "ENTITY\_AUTO\_MATCH",
-
-&#x20;           "RAW\_INPUT",
-
-&#x20;           startRow + r,
-
-&#x20;           inputText + " → " + bestMatch.name
-
-&#x20;         );
-
-&#x20;       }
+&#x20;       );
 
 &#x20;     }
 
@@ -344,13 +298,7 @@ ENTITY RESOLUTION + AUTO MATCH
 
 
 
-
-
-/\* =====================================================
-
-ENTITY PENDING
-
-===================================================== \*/
+&#x20;   /\* ---- ENTITY PENDING ---- \*/
 
 
 
@@ -368,7 +316,7 @@ ENTITY PENDING
 
 &#x20;         "RAW\_INPUT",
 
-&#x20;         startRow+r,
+&#x20;         startRow + r,
 
 &#x20;         "Entità non trovata: " + inputText
 
@@ -394,13 +342,9 @@ ENTITY PENDING
 
 &#x20;         if (lastRowEntity > 1) {
 
-&#x20;           existing = entitySheet.getRange(2,1,lastRowEntity-1,1).getValues();
+&#x20;           existing = entitySheet.getRange(2,1,lastRowEntity - 1,1).getValues();
 
 &#x20;         }
-
-
-
-&#x20;         const inputKey = inputText.toLowerCase();
 
 
 
@@ -410,7 +354,17 @@ ENTITY PENDING
 
 &#x20;         for (let i = 0; i < existing.length; i++) {
 
-&#x20;           const existingText = (existing\[i]\[0] || "").toString().trim().toLowerCase();
+
+
+&#x20;           const existingText = (existing\[i]\[0] || "")
+
+&#x20;             .toString()
+
+&#x20;             .trim()
+
+&#x20;             .toLowerCase();
+
+
 
 &#x20;           if (existingText === inputKey) {
 
@@ -431,10 +385,6 @@ ENTITY PENDING
 &#x20;           let suggestedName = "";
 
 &#x20;           let suggestedId = "";
-
-
-
-&#x20;           const suggestions = suggestEntity(inputText, entityMap);
 
 
 
@@ -472,7 +422,7 @@ ENTITY PENDING
 
 
 
-&#x20;       statusUpdates.push(\[startRow+r,"ENTITY\_PENDING"]);
+&#x20;       statusUpdates.push(\[startRow + r, "ENTITY\_PENDING"]);
 
 &#x20;       continue;
 
@@ -480,19 +430,17 @@ ENTITY PENDING
 
 
 
-&#x20;     if (status === "ENTITY\_PENDING") continue;
+&#x20;     if (status === "ENTITY\_PENDING") {
+
+&#x20;       continue;
+
+&#x20;     }
 
 &#x20;   }
 
 
 
-
-
-/\* =====================================================
-
-FINGERPRINT
-
-===================================================== \*/
+&#x20;   /\* ================= FINGERPRINT ================= \*/
 
 
 
@@ -512,11 +460,9 @@ FINGERPRINT
 
 
 
-&#x20;     logEvent("INPUT\_DUPLICATE\_SKIPPED","RAW\_INPUT",startRow+r,"Duplicato");
+&#x20;     logEvent("INPUT\_DUPLICATE\_SKIPPED","RAW\_INPUT",startRow + r,"Duplicato tecnico nello stesso batch");
 
-
-
-&#x20;     statusUpdates.push(\[startRow+r,"DUPLICATE"]);
+&#x20;     statusUpdates.push(\[startRow + r, "DUPLICATE"]);
 
 &#x20;     continue;
 
@@ -528,13 +474,7 @@ FINGERPRINT
 
 
 
-
-
-/\* =====================================================
-
-LEDGER
-
-===================================================== \*/
+&#x20;   /\* ================= LEDGER ================= \*/
 
 
 
@@ -574,21 +514,17 @@ LEDGER
 
 
 
-&#x20;   statusUpdates.push(\[startRow+r,"WRITTEN"]);
+&#x20;   statusUpdates.push(\[startRow + r, "WRITTEN"]);
 
 &#x20;   processedCount++;
+
+
 
 &#x20; }
 
 
 
-
-
-/\* =====================================================
-
-WRITE
-
-===================================================== \*/
+&#x20; /\* ================= SCRITTURA ================= \*/
 
 
 
@@ -600,25 +536,21 @@ WRITE
 
 
 
-&#x20;   ledgerSheet.getRange(startRowLedger,1,ledgerBuffer.length,ledgerBuffer\[0].length)
+&#x20;   ledgerSheet
+
+&#x20;     .getRange(startRowLedger,1,ledgerBuffer.length,ledgerBuffer\[0].length)
 
 &#x20;     .setValues(ledgerBuffer);
 
 
 
-&#x20;   logEvent("INPUT\_WRITTEN","RAW\_DATA",startRowLedger,ledgerBuffer.length+" eventi");
+&#x20;   logEvent("INPUT\_WRITTEN","RAW\_DATA",startRowLedger,ledgerBuffer.length + " eventi scritti");
 
 &#x20; }
 
 
 
-
-
-/\* =====================================================
-
-STATUS UPDATE
-
-===================================================== \*/
+&#x20; /\* ================= STATUS ================= \*/
 
 
 
@@ -632,7 +564,7 @@ STATUS UPDATE
 
 &#x20;   const statusRange = inputSheet
 
-&#x20;     .getRange(startRow,statusCol,inputData.length,1)
+&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
 
 &#x20;     .getValues();
 
@@ -648,7 +580,9 @@ STATUS UPDATE
 
 
 
-&#x20;   inputSheet.getRange(startRow,statusCol,inputData.length,1)
+&#x20;   inputSheet
+
+&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
 
 &#x20;     .setValues(statusRange);
 
@@ -656,9 +590,7 @@ STATUS UPDATE
 
 
 
-
-
-&#x20; logEvent("INPUT\_BATCH\_COMPLETED","RAW\_INPUT",0,processedCount+" eventi");
+&#x20; logEvent("INPUT\_BATCH\_COMPLETED","RAW\_INPUT",0,processedCount + " eventi processati");
 
 }
 
