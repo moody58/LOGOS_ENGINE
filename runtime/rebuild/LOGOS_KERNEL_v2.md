@@ -2,7 +2,7 @@
 
 LOGOS — Apps Script Kernel (CLEAN)
 
-Versione: v2.1 STABLE SAFE
+Versione: v2.2 HARDENED SAFE
 
 \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
 
@@ -66,13 +66,15 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; const sheet = e.range.getSheet();
 
+&#x20; const name = sheet.getName();
+
 &#x20; const row = e.range.getRow();
 
 
 
-&#x20; if (sheet.getName() !== "RAW\_INPUT") return;
+&#x20; if (name !== "RAW\_INPUT") return;
 
-&#x20; if (row === 1) return;
+&#x20; if (row < 2) return;
 
 
 
@@ -86,9 +88,9 @@ function LOGOS\_inputTrigger(e) {
 
 
 
-&#x20; // 👉 PROCESSA SOLO SE NEW
+&#x20; // PROCESSA SOLO SE NEW
 
-&#x20; if (status === "NEW") {
+&#x20; if (status === "NEW" || status === "ENTITY\_PENDING") {
 
 
 
@@ -138,7 +140,7 @@ function onEdit(e) {
 
 
 
-&#x20; if (row === 1) return;
+&#x20; if (row < 2) return;
 
 
 
@@ -164,9 +166,9 @@ function onEdit(e) {
 
 
 
-&#x20;   // solo colonna "User\_Confirmation"
+&#x20;   // sicurezza: solo colonna Confirm (D = 4)
 
-&#x20;   if (col !== 4 || row < 2) return;
+&#x20;   if (col !== 4) return;
 
 
 
@@ -182,7 +184,21 @@ function onEdit(e) {
 
 
 
-&#x20;   // 👉 commit entità
+&#x20;   logEvent(
+
+&#x20;     "ENTITY\_CONFIRM\_TRIGGER",
+
+&#x20;     "ENTITY\_CONFIRMATION",
+
+&#x20;     row,
+
+&#x20;     "Confirm ricevuto"
+
+&#x20;   );
+
+
+
+&#x20;   // commit entità
 
 &#x20;   LOGOS\_commitSingleEntity(row);
 
@@ -190,19 +206,19 @@ function onEdit(e) {
 
 &#x20;   logEvent(
 
-&#x20;     "ENTITY\_CONFIRMED",
+&#x20;     "AUTO\_REPROCESS\_TRIGGER",
 
 &#x20;     "ENTITY\_CONFIRMATION",
 
 &#x20;     row,
 
-&#x20;     "Entità confermata"
+&#x20;     "Reprocess automatico"
 
 &#x20;   );
 
 
 
-&#x20;   // 👉 reprocess
+&#x20;   // rilancia processor
 
 &#x20;   processRawInputV2();
 

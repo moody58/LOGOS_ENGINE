@@ -18,53 +18,19 @@ function processRawInputV2() {
 
 
 
-&#x20; /\* ================= DATA SAFE ================= \*/
+&#x20; const data = input.getRange(2,1,input.getLastRow()-1,12).getValues();
 
 
 
-&#x20; let data = \[];
+&#x20; const proj = projects.getRange(2,1,projects.getLastRow()-1,2).getValues();
 
-
-
-&#x20; if (input.getLastRow() > 1) {
-
-&#x20;   data = input.getRange(2,1,input.getLastRow()-1,13).getValues();
-
-&#x20; }
-
-
-
-&#x20; if (data.length === 0) return;
-
-
-
-&#x20; const proj = projects.getLastRow() > 1
-
-&#x20;   ? projects.getRange(2,1,projects.getLastRow()-1,2).getValues()
-
-&#x20;   : \[];
-
-
-
-&#x20; const ent = entities.getLastRow() > 1
-
-&#x20;   ? entities.getRange(2,1,entities.getLastRow()-1,6).getValues()
-
-&#x20;   : \[];
-
-
-
-&#x20; /\* ================= MAP ================= \*/
+&#x20; const ent = entities.getRange(2,1,entities.getLastRow()-1,6).getValues();
 
 
 
 &#x20; const pMap = {};
 
-&#x20; proj.forEach(r => {
-
-&#x20;   if (r\[1]) pMap\[r\[1].toString().trim().toLowerCase()] = r\[0];
-
-&#x20; });
+&#x20; proj.forEach(r => { if (r\[1]) pMap\[r\[1].toLowerCase()] = r\[0]; });
 
 
 
@@ -72,43 +38,35 @@ function processRawInputV2() {
 
 &#x20; ent.forEach(r => {
 
-&#x20;   if (r\[2]) eMap\[r\[2].toString().trim().toLowerCase()] = r\[0];
+&#x20;   if (r\[2]) eMap\[r\[2].toLowerCase()] = r\[0];
 
-&#x20;   if (r\[5]) eMap\[r\[5].toString().trim().toLowerCase()] = r\[0];
+&#x20;   if (r\[5]) eMap\[r\[5].toLowerCase()] = r\[0];
 
 &#x20; });
 
 
 
-&#x20; /\* ================= ENTITY CACHE ================= \*/
+&#x20; const lastRowEntity = entitySheet.getLastRow();
 
 
 
-&#x20; const existingEntities = new Set();
+&#x20; let existingEntities = \[];
 
 
 
-&#x20; if (entitySheet.getLastRow() > 1) {
+&#x20; if (lastRowEntity > 1) {
 
-&#x20;   entitySheet
+&#x20;   existingEntities = entitySheet
 
-&#x20;     .getRange(2,1,entitySheet.getLastRow()-1,1)
+&#x20;     .getRange(2,1,lastRowEntity-1,1)
 
 &#x20;     .getValues()
 
 &#x20;     .flat()
 
-&#x20;     .forEach(v => {
-
-&#x20;       if (v) existingEntities.add(v.toString().trim().toLowerCase());
-
-&#x20;     });
+&#x20;     .map(v => (v || "").toString().trim().toLowerCase());
 
 &#x20; }
-
-
-
-&#x20; /\* ================= BUFFER ================= \*/
 
 
 
@@ -120,11 +78,11 @@ function processRawInputV2() {
 
 
 
-&#x20; /\* ================= LOOP ================= \*/
+&#x20; const isEmpty = v => !v || v.toString().trim() === "";
 
 
 
-&#x20; for (let i = 0; i < data.length; i++) {
+&#x20; for (let i=0;i<data.length;i++) {
 
 
 
@@ -138,13 +96,7 @@ function processRawInputV2() {
 
 
 
-&#x20;   /\* ================= PROJECT ================= \*/
-
-
-
-&#x20;   const projectKey = (row\[1] || "").toString().trim().toLowerCase();
-
-&#x20;   const projectId = pMap\[projectKey];
+&#x20;   const projectId = pMap\[(row\[1]||"").toLowerCase()];
 
 
 
@@ -158,11 +110,7 @@ function processRawInputV2() {
 
 
 
-&#x20;   /\* ================= ENTITY ================= \*/
-
-
-
-&#x20;   const entityKey = (row\[9] || "").toString().trim().toLowerCase();
+&#x20;   const entityKey = (row\[9]||"").toLowerCase();
 
 &#x20;   const entityId = eMap\[entityKey];
 
@@ -172,7 +120,7 @@ function processRawInputV2() {
 
 
 
-&#x20;     if (!existingEntities.has(entityKey) \&\& entityKey !== "") {
+&#x20;     if (!existingEntities.includes(entityKey)) {
 
 
 
@@ -196,7 +144,7 @@ function processRawInputV2() {
 
 
 
-&#x20;       existingEntities.add(entityKey);
+&#x20;       existingEntities.push(entityKey);
 
 &#x20;     }
 
@@ -207,10 +155,6 @@ function processRawInputV2() {
 &#x20;     continue;
 
 &#x20;   }
-
-
-
-&#x20;   /\* ================= WRITE ================= \*/
 
 
 
@@ -256,10 +200,6 @@ function processRawInputV2() {
 
 
 
-&#x20; /\* ================= WRITE ENTITY ================= \*/
-
-
-
 &#x20; if (entityBuffer.length > 0) {
 
 &#x20;   entitySheet
@@ -272,10 +212,6 @@ function processRawInputV2() {
 
 
 
-&#x20; /\* ================= WRITE LEDGER ================= \*/
-
-
-
 &#x20; if (ledgerBuffer.length > 0) {
 
 &#x20;   ledger
@@ -285,10 +221,6 @@ function processRawInputV2() {
 &#x20;     .setValues(ledgerBuffer);
 
 &#x20; }
-
-
-
-&#x20; /\* ================= STATUS ================= \*/
 
 
 
@@ -305,12 +237,6 @@ function processRawInputV2() {
 &#x20; logEvent("PROCESSOR\_DONE","SYSTEM",0,statusUpdates.length + " righe processate");
 
 }
-
-
-
-
-
-/\* ================= ID ================= \*/
 
 
 

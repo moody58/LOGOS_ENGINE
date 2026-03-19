@@ -16,7 +16,21 @@ function LOGOS\_ingestEvent(event) {
 
 
 
-&#x20; const normalized = LOGOS\_normalizeEvent(event);
+&#x20; let normalized = {};
+
+
+
+&#x20; if (typeof LOGOS\_normalizeEvent === "function") {
+
+&#x20;   normalized = LOGOS\_normalizeEvent(event);
+
+&#x20; } else {
+
+&#x20;   // fallback di sicurezza (non rompe sistema)
+
+&#x20;   normalized = event || {};
+
+&#x20; }
 
 
 
@@ -24,11 +38,19 @@ function LOGOS\_ingestEvent(event) {
 
 
 
-&#x20; const validation = LOGOS\_validateEvent(normalized);
+&#x20; let validation = { warnings: \[] };
 
 
 
-&#x20; if (validation.warnings.length > 0) {
+&#x20; if (typeof LOGOS\_validateEvent === "function") {
+
+&#x20;   validation = LOGOS\_validateEvent(normalized);
+
+&#x20; }
+
+
+
+&#x20; if (validation.warnings \&\& validation.warnings.length > 0) {
 
 
 
@@ -48,6 +70,14 @@ function LOGOS\_ingestEvent(event) {
 
 
 
+&#x20; /\* ================= SAFE VALUES ================= \*/
+
+
+
+&#x20; const safe = (v) => v || "";
+
+
+
 &#x20; /\* ================= WRITE RAW\_INPUT ================= \*/
 
 
@@ -56,29 +86,35 @@ function LOGOS\_ingestEvent(event) {
 
 &#x20;   now,
 
-&#x20;   normalized.project\_name,
+&#x20;   safe(normalized.project\_name),
 
-&#x20;   normalized.tipo,
+&#x20;   safe(normalized.tipo),
 
-&#x20;   normalized.valore,
+&#x20;   safe(normalized.valore),
 
-&#x20;   normalized.data\_evento,
+&#x20;   safe(normalized.data\_evento),
 
-&#x20;   normalized.causale,
+&#x20;   safe(normalized.causale),
 
-&#x20;   normalized.riferimento,
+&#x20;   safe(normalized.riferimento),
 
-&#x20;   normalized.metodo\_pagamento,
+&#x20;   safe(normalized.metodo\_pagamento),
 
-&#x20;   normalized.note,
+&#x20;   safe(normalized.note),
 
-&#x20;   normalized.soggetto,
+&#x20;   safe(normalized.soggetto),
 
-&#x20;   normalized.source,
+&#x20;   safe(normalized.source || "MANUAL"),
 
 &#x20;   "NEW"
 
 &#x20; ]);
+
+
+
+&#x20; processRawInputV2();
+
+&#x20; 
 
 }
 
