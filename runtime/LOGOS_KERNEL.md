@@ -2,21 +2,13 @@
 
 LOGOS — Apps Script Kernel (CLEAN)
 
-Versione: v2.0 STABLE
-
-Ruolo: Orchestrazione eventi (NO business logic)
+Versione: v2.2 HARDENED SAFE
 
 \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
 
 
 
-
-
-/\* =====================================================
-
-SYSTEM LOG
-
-===================================================== \*/
+/\* ================= LOG ================= \*/
 
 
 
@@ -54,19 +46,13 @@ function logEvent(eventType, sheetName, row, details) {
 
 &#x20; ]);
 
-
-
 }
 
 
 
 
 
-/\* =====================================================
-
-INPUT TRIGGER (PROCESSOR ENTRY POINT)
-
-===================================================== \*/
+/\* ================= INPUT TRIGGER ================= \*/
 
 
 
@@ -80,25 +66,31 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; const sheet = e.range.getSheet();
 
-&#x20; const sheetName = sheet.getName();
+&#x20; const name = sheet.getName();
 
 &#x20; const row = e.range.getRow();
 
 
 
-&#x20; if (sheetName !== "RAW\_INPUT") return;
+&#x20; if (name !== "RAW\_INPUT") return;
 
-&#x20; if (row === 1) return;
-
-
-
-&#x20; const statusColumn = 12;
-
-&#x20; const status = sheet.getRange(row, statusColumn).getValue();
+&#x20; if (row < 2) return;
 
 
 
-&#x20; if (status === "NEW") {
+&#x20; const status = (sheet.getRange(row, 12).getValue() || "")
+
+&#x20;   .toString()
+
+&#x20;   .trim()
+
+&#x20;   .toUpperCase();
+
+
+
+&#x20; // PROCESSA SOLO SE NEW
+
+&#x20; if (status === "NEW" || status === "ENTITY\_PENDING") {
 
 
 
@@ -110,7 +102,7 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20;     row,
 
-&#x20;     "Nuovo evento rilevato"
+&#x20;     "Nuovo evento"
 
 &#x20;   );
 
@@ -120,19 +112,13 @@ function LOGOS\_inputTrigger(e) {
 
 &#x20; }
 
-
-
 }
 
 
 
 
 
-/\* =====================================================
-
-ON EDIT CORE HANDLER (ORCHESTRAZIONE PURA)
-
-===================================================== \*/
+/\* ================= MAIN HANDLER ================= \*/
 
 
 
@@ -146,7 +132,7 @@ function onEdit(e) {
 
 &#x20; const sheet = e.range.getSheet();
 
-&#x20; const sheetName = sheet.getName();
+&#x20; const name = sheet.getName();
 
 &#x20; const row = e.range.getRow();
 
@@ -154,23 +140,15 @@ function onEdit(e) {
 
 
 
-&#x20; if (row === 1) return;
+&#x20; if (row < 2) return;
 
 
 
-
-
-&#x20; /\* =====================================================
-
-&#x20; RAW\_INPUT → TRIGGER PROCESSOR
-
-&#x20; ===================================================== \*/
+&#x20; /\* ================= RAW INPUT ================= \*/
 
 
 
-&#x20; if (sheetName === "RAW\_INPUT") {
-
-
+&#x20; if (name === "RAW\_INPUT") {
 
 &#x20;   LOGOS\_inputTrigger(e);
 
@@ -180,325 +158,155 @@ function onEdit(e) {
 
 
 
+/\* ================= ENTITY CONFIRMATION ================= \*/
 
 
-&#x20; /\* =====================================================
 
-&#x20; ENTITY\_CONFIRMATION → COMMIT + REPROCESS
+if (name === "ENTITY\_CONFIRMATION") {
 
-&#x20; ===================================================== \*/
 
 
+&#x20; // sicurezza: solo colonna Confirm (D = 4)
 
-&#x20; if (sheetName === "ENTITY\_CONFIRMATION") {
+&#x20; if (col !== 4) return;
 
 
 
-&#x20;   if (col !== 4 || row < 2) return;
+&#x20; const value = (e.value || "")
 
+&#x20;   .toString()
 
+&#x20;   .trim();
 
-&#x20;   const value = (e.value || "").toString().trim();
 
 
+&#x20; if (value !== "Confirm") return;
 
-&#x20;   if (value !== "Confirm") return;
 
 
+&#x20; logEvent(
 
-&#x20;   LOGOS\_commitSingleEntity(row);
+&#x20;   "ENTITY\_CONFIRM\_TRIGGER",
 
+&#x20;   "ENTITY\_CONFIRMATION",
 
+&#x20;   row,
 
-&#x20;   logEvent(
+&#x20;   "Confirm ricevuto"
 
-&#x20;     "AUTO\_REPROCESS\_TRIGGER",
+&#x20; );
 
-&#x20;     "ENTITY\_CONFIRMATION",
 
-&#x20;     row,
 
-&#x20;     "Reprocess automatico avviato"
+&#x20; // commit entità
 
-&#x20;   );
+&#x20; LOGOS\_commitSingleEntity(row);
 
 
 
-&#x20;   processRawInputV2();
+&#x20; logEvent(
 
+&#x20;   "AUTO\_REPROCESS\_TRIGGER",
 
+&#x20;   "ENTITY\_CONFIRMATION",
 
-&#x20;   return;
+&#x20;   row,
 
-&#x20; }
+&#x20;   "Reprocess automatico"
 
+&#x20; );
 
 
 
+&#x20; // rilancia processor
 
-&#x20; /\* =====================================================
+&#x20; processRawInputV2();
 
-&#x20; PROTEZIONE CHIAVI PRIMARIE
 
-&#x20; ===================================================== \*/
 
+&#x20; return;
 
+}
 
-&#x20; const protectedColumns = {
 
-&#x20;   "RAW\_DATA": \[1,2],
 
-&#x20;   "ENTITIES": \[1],
 
-&#x20;   "PROJECTS": \[1]
 
-&#x20; };
+/\* ================= PROJECT CONFIRMATION ================= \*/
 
 
 
-&#x20; if (protectedColumns\[sheetName] \&\& protectedColumns\[sheetName].includes(col)) {
+if (name === "PROJECT\_CONFIRMATION") {
 
 
 
-&#x20;   if (e.oldValue !== undefined) {
+&#x20; // ⚠️ QUI CONTROLLA COLONNA CORRETTA
 
-&#x20;     e.range.setValue(e.oldValue);
+&#x20; const CONFIRM\_COLUMN = 4; // ← cambia se diverso
 
-&#x20;   } else {
 
-&#x20;     e.range.clearContent();
 
-&#x20;   }
+&#x20; if (col !== CONFIRM\_COLUMN) return;
 
 
 
-&#x20;   SpreadsheetApp.getActive().toast(
+const value = (e.value || "")
 
-&#x20;     "Modifica chiave primaria non consentita",
+&#x20; .toString()
 
-&#x20;     "Integrità Sistema",
+&#x20; .trim()
 
-&#x20;     3
+&#x20; .toLowerCase();
 
-&#x20;   );
 
 
+if (value !== "confirm" \&\& value !== "true") return;
 
-&#x20;   logEvent(
 
-&#x20;     "PRIMARY\_KEY\_PROTECTION",
 
-&#x20;     sheetName,
+&#x20; logEvent(
 
-&#x20;     row,
+&#x20;   "PROJECT\_CONFIRM\_TRIGGER",
 
-&#x20;     "Tentativo modifica chiave primaria"
+&#x20;   "PROJECT\_CONFIRMATION",
 
-&#x20;   );
+&#x20;   row,
 
+&#x20;   "Confirm ricevuto"
 
+&#x20; );
 
-&#x20;   return;
 
-&#x20; }
 
+&#x20; // commit progetto
 
+&#x20; LOGOS\_commitSingleProject(row);
 
 
 
-&#x20; /\* =====================================================
+&#x20; logEvent(
 
-&#x20; PROJECTS — CREAZIONE PROGETTO
+&#x20;   "AUTO\_REPROCESS\_TRIGGER",
 
-&#x20; ===================================================== \*/
+&#x20;   "PROJECT\_CONFIRMATION",
 
+&#x20;   row,
 
+&#x20;   "Reprocess automatico"
 
-&#x20; if (sheetName === "PROJECTS") {
+&#x20; );
 
 
 
-&#x20;   const props = PropertiesService.getDocumentProperties();
+&#x20; // rilancia processor
 
+&#x20; processRawInputV2();
 
 
-&#x20;   const idColumn = 1;
 
-&#x20;   const nameColumn = 2;
+&#x20; return;
 
-&#x20;   const parentColumn = 3;
-
-&#x20;   const createdColumn = 8;
-
-
-
-&#x20;   if (col === nameColumn \&\& e.value) {
-
-
-
-&#x20;     const idCell = sheet.getRange(row, idColumn);
-
-&#x20;     const createdCell = sheet.getRange(row, createdColumn);
-
-
-
-&#x20;     if (!idCell.getValue()) {
-
-
-
-&#x20;       let lastProject = parseInt(props.getProperty("LAST\_PRJ\_NUMBER")) || 0;
-
-&#x20;       const nextProject = lastProject + 1;
-
-
-
-&#x20;       props.setProperty("LAST\_PRJ\_NUMBER", nextProject);
-
-
-
-&#x20;       const newProjectId = "PRJ\_" + String(nextProject).padStart(6, "0");
-
-
-
-&#x20;       idCell.setValue(newProjectId);
-
-&#x20;       createdCell.setValue(new Date());
-
-
-
-&#x20;       logEvent("PROJECT\_CREATED", sheetName, row, newProjectId);
-
-&#x20;     }
-
-&#x20;   }
-
-
-
-&#x20;   if (col === parentColumn) {
-
-
-
-&#x20;     const currentId = sheet.getRange(row, idColumn).getValue();
-
-
-
-&#x20;     if (currentId \&\& e.value === currentId) {
-
-
-
-&#x20;       e.range.clearContent();
-
-
-
-&#x20;       SpreadsheetApp.getActive().toast(
-
-&#x20;         "Un progetto non può essere padre di sé stesso",
-
-&#x20;         "Errore Gerarchia",
-
-&#x20;         3
-
-&#x20;       );
-
-
-
-&#x20;       logEvent("PROJECT\_HIERARCHY\_ERROR", sheetName, row, "Auto-parent");
-
-&#x20;     }
-
-&#x20;   }
-
-&#x20; }
-
-
-
-
-
-&#x20; /\* =====================================================
-
-&#x20; ENTITIES — METADATA (NO ID GENERATION)
-
-&#x20; ===================================================== \*/
-
-
-
-&#x20; if (sheetName === "ENTITIES") {
-
-
-
-&#x20;   const idColumn = 1;
-
-&#x20;   const parentColumn = 14;
-
-&#x20;   const createdColumn = 15;
-
-&#x20;   const modifiedColumn = 16;
-
-
-
-&#x20;   const idCell = sheet.getRange(row, idColumn);
-
-&#x20;   const modifiedCell = sheet.getRange(row, modifiedColumn);
-
-
-
-&#x20;   if (col === parentColumn) {
-
-
-
-&#x20;     const currentId = idCell.getValue();
-
-
-
-&#x20;     if (currentId \&\& e.value === currentId) {
-
-
-
-&#x20;       e.range.clearContent();
-
-
-
-&#x20;       SpreadsheetApp.getActive().toast(
-
-&#x20;         "Un'entità non può essere padre di sé stessa",
-
-&#x20;         "Errore Gerarchia",
-
-&#x20;         3
-
-&#x20;       );
-
-
-
-&#x20;       logEvent("ENTITY\_HIERARCHY\_ERROR", sheetName, row, "Auto-parent");
-
-&#x20;       return;
-
-&#x20;     }
-
-&#x20;   }
-
-
-
-&#x20;   if (
-
-&#x20;     idCell.getValue() \&\&
-
-&#x20;     col !== idColumn \&\&
-
-&#x20;     col !== createdColumn \&\&
-
-&#x20;     col !== modifiedColumn
-
-&#x20;   ) {
-
-&#x20;     modifiedCell.setValue(new Date());
-
-&#x20;   }
-
-&#x20; }
-
-
+}
 
 }
 

@@ -1,15 +1,3 @@
-/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*
-
-LOGOS ENGINE — INPUT PROCESSOR
-
-Versione: v1.8 FINAL STABLE
-
-Pipeline: RAW\_INPUT → PROCESSOR → RAW\_DATA
-
-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/
-
-
-
 function processRawInputV2() {
 
 
@@ -18,59 +6,39 @@ function processRawInputV2() {
 
 
 
-&#x20; const MAX\_EVENTS\_PER\_RUN = 50;
-
-&#x20; let processedCount = 0;
-
-
-
 &#x20; const ss = SpreadsheetApp.getActive();
 
 
 
-&#x20; const inputSheet = ss.getSheetByName("RAW\_INPUT");
+&#x20; const input = ss.getSheetByName("RAW\_INPUT");
 
-&#x20; const ledgerSheet = ss.getSheetByName("RAW\_DATA");
+&#x20; const ledger = ss.getSheetByName("RAW\_DATA");
 
-&#x20; const projectsSheet = ss.getSheetByName("PROJECTS");
+&#x20; const projects = ss.getSheetByName("PROJECTS");
 
-&#x20; const entitiesSheet = ss.getSheetByName("ENTITIES");
+&#x20; const entities = ss.getSheetByName("ENTITIES");
 
-
-
-&#x20; const props = PropertiesService.getDocumentProperties();
+&#x20; const entitySheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
 
 
 
-&#x20; const lastRow = inputSheet.getLastRow();
-
-&#x20; const lastCol = inputSheet.getLastColumn();
+&#x20; /\* ================= SAFETY ================= \*/
 
 
 
-&#x20; if (lastRow < 2) return;
+&#x20; if (input.getLastRow() < 2) return;
 
 
 
-&#x20; const startRow = 2;
+&#x20; const lastCol = input.getLastColumn();
 
-&#x20; const numRows = lastRow - startRow + 1;
+&#x20; const headers = input.getRange(1,1,1,lastCol).getValues()\[0];
 
-
-
-&#x20; if (numRows <= 0 || startRow > lastRow) {
-
-&#x20;   logEvent("INPUT\_BATCH\_COMPLETED","RAW\_INPUT",0,"0 eventi processati");
-
-&#x20;   return;
-
-&#x20; }
+&#x20; const data = input.getRange(2,1,input.getLastRow()-1,lastCol).getValues();
 
 
 
-&#x20; const headers = inputSheet.getRange(1,1,1,lastCol).getValues()\[0];
-
-&#x20; const inputData = inputSheet.getRange(startRow,1,numRows,lastCol).getValues();
+&#x20; /\* ================= HEADER MAP ================= \*/
 
 
 
@@ -80,43 +48,83 @@ function processRawInputV2() {
 
 
 
-&#x20; /\* ================= MAPPE ================= \*/
+&#x20; const get = (row, field) => {
+
+&#x20;   const i = headerIndex\[field];
+
+&#x20;   return i !== undefined ? row\[i] : "";
+
+&#x20; };
 
 
 
-&#x20; let projects = \[];
-
-&#x20; const projectsLastRow = projectsSheet.getLastRow();
+&#x20; /\* ================= MAP ================= \*/
 
 
 
-&#x20; if (projectsLastRow > 1) {
+&#x20; const proj = projects.getLastRow() > 1
 
-&#x20;   projects = projectsSheet.getRange(2,1,projectsLastRow - 1,2).getValues();
+&#x20;   ? projects.getRange(2,1,projects.getLastRow()-1,2).getValues()
+
+&#x20;   : \[];
+
+
+
+&#x20; const ent = entities.getLastRow() > 1
+
+&#x20;   ? entities.getRange(2,1,entities.getLastRow()-1,6).getValues()
+
+&#x20;   : \[];
+
+
+
+&#x20; const pMap = {};
+
+&#x20; proj.forEach(r => {
+
+&#x20;   if (r\[1]) pMap\[r\[1].toString().trim().toLowerCase()] = r\[0];
+
+&#x20; });
+
+
+
+&#x20; const eMap = {};
+
+&#x20; ent.forEach(r => {
+
+&#x20;   if (r\[2]) eMap\[r\[2].toString().trim().toLowerCase()] = r\[0];
+
+&#x20;   if (r\[5]) eMap\[r\[5].toString().trim().toLowerCase()] = r\[0];
+
+&#x20; });
+
+
+
+&#x20; /\* ================= ENTITY CACHE ================= \*/
+
+
+
+&#x20; const existingEntities = new Set();
+
+
+
+&#x20; if (entitySheet.getLastRow() > 1) {
+
+&#x20;   entitySheet
+
+&#x20;     .getRange(2,1,entitySheet.getLastRow()-1,1)
+
+&#x20;     .getValues()
+
+&#x20;     .flat()
+
+&#x20;     .forEach(v => {
+
+&#x20;       if (v) existingEntities.add(v.toString().trim().toLowerCase());
+
+&#x20;     });
 
 &#x20; }
-
-
-
-&#x20; const projectMap = buildProjectMap(projects);
-
-
-
-&#x20; let entities = \[];
-
-&#x20; const entitiesLastRow = entitiesSheet.getLastRow();
-
-
-
-&#x20; if (entitiesLastRow > 1) {
-
-&#x20;   entities = entitiesSheet.getRange(2,1,entitiesLastRow - 1,6).getValues();
-
-&#x20; }
-
-
-
-&#x20; const entityMap = buildEntityMap(entities);
 
 
 
@@ -124,11 +132,69 @@ function processRawInputV2() {
 
 
 
-&#x20; const batchFingerprints = new Set();
+&#x20; const statusUpdates = \[];
 
 &#x20; const ledgerBuffer = \[];
 
-&#x20; const statusUpdates = \[];
+&#x20; const entityBuffer = \[];
+
+
+
+&#x20; /\* ================= BATCH CONTROL ================= \*/
+
+
+
+&#x20; const MAX\_EVENTS = 50;
+
+&#x20; let processed = 0;
+
+
+
+&#x20; // === DUPLICATE CACHE (PRELOAD UNA VOLTA) ===
+
+
+
+const existingFingerprints = new Set();
+
+
+
+if (ledger.getLastRow() > 1) {
+
+&#x20; const existingData = ledger
+
+&#x20;   .getRange(2,5,ledger.getLastRow()-1,5)
+
+&#x20;   .getValues();
+
+
+
+&#x20; existingData.forEach(r => {
+
+&#x20;   const fp =
+
+&#x20;     r\[0] + "|" +
+
+&#x20;     r\[1] + "|" +
+
+&#x20;     r\[2] + "|" +
+
+&#x20;     r\[3] + "|" +
+
+&#x20;     r\[4];
+
+
+
+&#x20;   existingFingerprints.add(fp);
+
+&#x20; });
+
+}
+
+
+
+// cache duplicati nel batch corrente
+
+const batchFingerprints = new Set();
 
 
 
@@ -136,395 +202,331 @@ function processRawInputV2() {
 
 
 
-&#x20; for (let r = 0; r < inputData.length; r++) {
+&#x20; for (let i = 0; i < data.length; i++) {
 
 
 
-&#x20;   if (processedCount >= MAX\_EVENTS\_PER\_RUN) break;
+&#x20;   if (processed >= MAX\_EVENTS) break;
 
 
 
-&#x20;   const row = inputData\[r];
+&#x20;   const row = data\[i];
 
 
 
-&#x20;   const status = (row\[headerIndex\["Status"]] || "").toString().trim();
+&#x20;   const status = (get(row,"Status") || "")
+
+&#x20;     .toString()
+
+&#x20;     .trim()
+
+&#x20;     .toUpperCase();
 
 
 
-&#x20;   if (status !== "NEW" \&\& status !== "ENTITY\_PENDING") continue;
+&#x20;   if (
+
+&#x20; status !== "NEW" \&\&
+
+&#x20; status !== "ENTITY\_PENDING" \&\&
+
+&#x20; status !== "PROJECT\_PENDING"
+
+) continue;
 
 
 
-&#x20;   const event = {
-
-&#x20;     projectName: row\[headerIndex\["Project\_Name"]],
-
-&#x20;     tipo: row\[headerIndex\["Tipo\_Movimento"]],
-
-&#x20;     valore: row\[headerIndex\["Valore"]],
-
-&#x20;     dataEvento: row\[headerIndex\["Data\_Evento"]],
-
-&#x20;     causale: row\[headerIndex\["Causale"]],
-
-&#x20;     riferimento: row\[headerIndex\["Riferimento\_ID"]],
-
-&#x20;     metodoPagamento: row\[headerIndex\["Metodo\_Pagamento"]],
-
-&#x20;     note: row\[headerIndex\["Note"]],
-
-&#x20;     soggetto: row\[headerIndex\["Soggetto"]],
-
-&#x20;     source: row\[headerIndex\["Source"]]
-
-&#x20;   };
+&#x20;   /\* ================= PROJECT ================= \*/
 
 
 
-&#x20;   const normalizedEvent = normalizeEvent({
+&#x20;   const projectKey = (get(row,"Project\_Name") || "")
 
-&#x20;     project\_name: event.projectName,
+&#x20;     .toString()
 
-&#x20;     tipo: event.tipo,
+&#x20;     .trim()
 
-&#x20;     valore: event.valore,
-
-&#x20;     data\_evento: event.dataEvento,
-
-&#x20;     causale: event.causale,
-
-&#x20;     riferimento: event.riferimento,
-
-&#x20;     metodo\_pagamento: event.metodoPagamento,
-
-&#x20;     note: event.note,
-
-&#x20;     soggetto: event.soggetto,
-
-&#x20;     source: event.source
-
-&#x20;   });
+&#x20;     .toLowerCase();
 
 
 
-&#x20;   /\* ================= VALIDAZIONE ================= \*/
+&#x20;   const projectId = pMap\[projectKey];
 
 
 
-&#x20;   const validation = validationEngine(normalizedEvent, projectMap);
+&#x20;   if (!projectId) {
 
 
 
-&#x20;   if (!validation.valid) {
+&#x20; logEvent("INPUT\_PROJECT\_PENDING","RAW\_INPUT",i+2,projectKey);
 
-&#x20;     logEvent("INPUT\_ERROR\_PROJECT","RAW\_INPUT",startRow + r,"Progetto non trovato: " + event.projectName);
 
-&#x20;     statusUpdates.push(\[startRow + r, "ERROR\_PROJECT"]);
 
-&#x20;     continue;
+&#x20; // === NUOVO BLOCCO ===
+
+
+
+&#x20; const projectConfirmSheet = ss.getSheetByName("PROJECT\_CONFIRMATION");
+
+
+
+&#x20; if (projectConfirmSheet) {
+
+
+
+&#x20;   let existing = \[];
+
+
+
+if (projectConfirmSheet.getLastRow() > 1) {
+
+&#x20; existing = projectConfirmSheet
+
+&#x20;   .getRange(2,1,projectConfirmSheet.getLastRow()-1,1)
+
+&#x20;   .getValues()
+
+&#x20;   .flat()
+
+&#x20;   .map(v => v.toString().trim().toLowerCase());
+
+}
+
+
+
+&#x20;   if (!existing.includes(projectKey) \&\& projectKey !== "") {
+
+
+
+&#x20;     projectConfirmSheet.appendRow(\[
+
+&#x20;       get(row,"Project\_Name"),
+
+&#x20;       "", "", "", "", new Date(), "PENDING"
+
+&#x20;     ]);
+
+
+
+&#x20;     logEvent(
+
+&#x20;       "PROJECT\_CREATED\_PENDING",
+
+&#x20;       "PROJECT\_CONFIRMATION",
+
+&#x20;       i+2,
+
+&#x20;       projectKey
+
+&#x20;     );
 
 &#x20;   }
-
-
-
-&#x20;   /\* ================= ENTITY RESOLUTION ================= \*/
-
-
-
-&#x20;   const inputText = (normalizedEvent.soggetto || "").toString().trim();
-
-&#x20;   const inputKey = inputText.toLowerCase();
-
-
-
-&#x20;   let suggestions = null;
-
-
-
-&#x20;   if (inputText) {
-
-&#x20;     suggestions = suggestEntity(inputText, entityMap);
-
-&#x20;   }
-
-
-
-&#x20;   let entityResult = entityResolutionEngine(normalizedEvent, entityMap);
-
-
-
-&#x20;   /\* ---- AUTO MATCH ---- \*/
-
-
-
-&#x20;   if (entityResult.status !== "OK" \&\& suggestions \&\& suggestions.length > 0) {
-
-
-
-&#x20;     const bestMatch = suggestions\[0];
-
-
-
-&#x20;     if (bestMatch.score >= 0.85) {
-
-
-
-&#x20;       entityResult = {
-
-&#x20;         status: "OK",
-
-&#x20;         entityId: bestMatch.id
-
-&#x20;       };
-
-
-
-&#x20;       logEvent(
-
-&#x20;         "ENTITY\_AUTO\_MATCH",
-
-&#x20;         "RAW\_INPUT",
-
-&#x20;         startRow + r,
-
-&#x20;         "Match automatico: " + inputText + " → " + bestMatch.name
-
-&#x20;       );
-
-&#x20;     }
-
-&#x20;   }
-
-
-
-&#x20;   /\* ---- ENTITY PENDING ---- \*/
-
-
-
-&#x20;   if (entityResult.status !== "OK") {
-
-
-
-&#x20;     if (status === "NEW") {
-
-
-
-&#x20;       logEvent(
-
-&#x20;         "INPUT\_ENTITY\_PENDING",
-
-&#x20;         "RAW\_INPUT",
-
-&#x20;         startRow + r,
-
-&#x20;         "Entità non trovata: " + inputText
-
-&#x20;       );
-
-
-
-&#x20;       const entitySheet = ss.getSheetByName("ENTITY\_CONFIRMATION");
-
-
-
-&#x20;       if (entitySheet) {
-
-
-
-&#x20;         const lastRowEntity = entitySheet.getLastRow();
-
-
-
-&#x20;         let existing = \[];
-
-
-
-&#x20;         if (lastRowEntity > 1) {
-
-&#x20;           existing = entitySheet.getRange(2,1,lastRowEntity - 1,1).getValues();
-
-&#x20;         }
-
-
-
-&#x20;         let alreadyExists = false;
-
-
-
-&#x20;         for (let i = 0; i < existing.length; i++) {
-
-
-
-&#x20;           const existingText = (existing\[i]\[0] || "")
-
-&#x20;             .toString()
-
-&#x20;             .trim()
-
-&#x20;             .toLowerCase();
-
-
-
-&#x20;           if (existingText === inputKey) {
-
-&#x20;             alreadyExists = true;
-
-&#x20;             break;
-
-&#x20;           }
-
-&#x20;         }
-
-
-
-&#x20;         if (!alreadyExists \&\& inputText !== "") {
-
-
-
-&#x20;           let suggestedName = "";
-
-&#x20;           let suggestedId = "";
-
-
-
-&#x20;           if (suggestions \&\& suggestions.length > 0) {
-
-&#x20;             suggestedName = suggestions\[0].name;
-
-&#x20;             suggestedId = suggestions\[0].id;
-
-&#x20;           }
-
-
-
-&#x20;           entitySheet.appendRow(\[
-
-&#x20;             inputText,
-
-&#x20;             suggestedName,
-
-&#x20;             suggestedId,
-
-&#x20;             "",
-
-&#x20;             "",
-
-&#x20;             new Date(),
-
-&#x20;             suggestedId ? "SUGGESTED" : "PENDING"
-
-&#x20;           ]);
-
-&#x20;         }
-
-&#x20;       }
-
-
-
-&#x20;       statusUpdates.push(\[startRow + r, "ENTITY\_PENDING"]);
-
-&#x20;       continue;
-
-&#x20;     }
-
-
-
-&#x20;     if (status === "ENTITY\_PENDING") {
-
-&#x20;       continue;
-
-&#x20;     }
-
-&#x20;   }
-
-
-
-&#x20;   /\* ================= FINGERPRINT ================= \*/
-
-
-
-&#x20;   const fingerprint = generateEventFingerprint(
-
-&#x20;     normalizedEvent,
-
-&#x20;     validation.projectId,
-
-&#x20;     entityResult.entityId
-
-&#x20;   );
-
-
-
-&#x20;   if (batchFingerprints.has(fingerprint)) {
-
-
-
-&#x20;     logEvent("INPUT\_DUPLICATE\_SKIPPED","RAW\_INPUT",startRow + r,"Duplicato tecnico nello stesso batch");
-
-&#x20;     statusUpdates.push(\[startRow + r, "DUPLICATE"]);
-
-&#x20;     continue;
-
-&#x20;   }
-
-
-
-&#x20;   batchFingerprints.add(fingerprint);
-
-
-
-&#x20;   /\* ================= LEDGER ================= \*/
-
-
-
-&#x20;   ledgerBuffer.push(\[
-
-&#x20;     LOGOS\_generateMovementID(),
-
-&#x20;     new Date(),
-
-&#x20;     normalizedEvent.dataEvento,
-
-&#x20;     normalizedEvent.soggetto,
-
-&#x20;     validation.projectId,
-
-&#x20;     entityResult.entityId,
-
-&#x20;     normalizedEvent.tipo,
-
-&#x20;     normalizedEvent.valore,
-
-&#x20;     "",
-
-&#x20;     normalizedEvent.causale,
-
-&#x20;     "",
-
-&#x20;     normalizedEvent.riferimento,
-
-&#x20;     normalizedEvent.source,
-
-&#x20;     normalizedEvent.metodoPagamento,
-
-&#x20;     normalizedEvent.note
-
-&#x20;   ]);
-
-
-
-&#x20;   statusUpdates.push(\[startRow + r, "WRITTEN"]);
-
-&#x20;   processedCount++;
-
-
 
 &#x20; }
 
 
 
-&#x20; /\* ================= SCRITTURA ================= \*/
+&#x20; // === FINE BLOCCO ===
+
+
+
+&#x20; statusUpdates.push(\[i+2, "PROJECT\_PENDING"]);
+
+&#x20; continue;
+
+}
+
+
+
+&#x20;   /\* ================= ENTITY ================= \*/
+
+
+
+&#x20;   const entityKey = (get(row,"Soggetto") || "")
+
+&#x20;     .toString()
+
+&#x20;     .trim()
+
+&#x20;     .toLowerCase();
+
+
+
+&#x20;   const entityId = eMap\[entityKey];
+
+
+
+&#x20;   if (!entityId) {
+
+
+
+&#x20;     if (!existingEntities.has(entityKey) \&\& entityKey !== "") {
+
+
+
+&#x20;       entityBuffer.push(\[
+
+&#x20;         get(row,"Soggetto"),
+
+&#x20;         "",
+
+&#x20;         "",
+
+&#x20;         "",
+
+&#x20;         "",
+
+&#x20;         new Date(),
+
+&#x20;         "PENDING"
+
+&#x20;       ]);
+
+
+
+&#x20;       existingEntities.add(entityKey);
+
+
+
+&#x20;       logEvent("ENTITY\_CREATED\_PENDING","ENTITY\_CONFIRMATION",i+2,entityKey);
+
+&#x20;     }
+
+
+
+&#x20;     statusUpdates.push(\[i+2, "ENTITY\_PENDING"]);
+
+&#x20;     continue;
+
+&#x20;   }
+
+
+
+/\* ================= WRITE ================= \*/
+
+
+
+// === DUPLICATE CHECK (SAFE) ===
+
+
+
+const refId = (get(row,"Riferimento\_ID") || "").toString().trim();
+
+
+
+if (refId !== "") {
+
+
+
+&#x20; if (!globalThis.\_refIds) globalThis.\_refIds = new Set();
+
+
+
+&#x20; // duplicato nel batch
+
+&#x20; if (globalThis.\_refIds.has(refId)) {
+
+&#x20;   statusUpdates.push(\[i+2, "DUPLICATE"]);
+
+&#x20;   continue;
+
+&#x20; }
+
+
+
+&#x20; // duplicato storico
+
+&#x20; const existingRefs = ledger.getLastRow() > 1
+
+&#x20;   ? ledger.getRange(2,12,ledger.getLastRow()-1,1).getValues().flat()
+
+&#x20;   : \[];
+
+
+
+&#x20; if (existingRefs.includes(refId)) {
+
+&#x20;   statusUpdates.push(\[i+2, "DUPLICATE"]);
+
+&#x20;   continue;
+
+&#x20; }
+
+
+
+&#x20; globalThis.\_refIds.add(refId);
+
+}
+
+
+
+// === WRITE ===
+
+
+
+ledgerBuffer.push(\[
+
+&#x20; LOGOS\_generateMovementID(),
+
+&#x20; new Date(),
+
+&#x20; get(row,"Data\_Evento"),
+
+&#x20; get(row,"Soggetto"),
+
+&#x20; projectId,
+
+&#x20; entityId,
+
+&#x20; get(row,"Tipo\_Movimento"),
+
+&#x20; get(row,"Valore"),
+
+&#x20; "",
+
+&#x20; get(row,"Causale"),
+
+&#x20; "",
+
+&#x20; get(row,"Riferimento\_ID"),
+
+&#x20; get(row,"Source"),          // → va in "Fonte"
+
+&#x20; get(row,"Metodo\_Pagamento"),
+
+&#x20; get(row,"Note")
+
+]);
+
+
+
+&#x20;   statusUpdates.push(\[i+2, "WRITTEN"]);
+
+
+
+&#x20;   processed++;
+
+&#x20; }
+
+
+
+&#x20; /\* ================= WRITE ENTITY ================= \*/
+
+
+
+&#x20; if (entityBuffer.length > 0) {
+
+&#x20;   entitySheet
+
+&#x20;     .getRange(entitySheet.getLastRow()+1,1,entityBuffer.length,7)
+
+&#x20;     .setValues(entityBuffer);
+
+&#x20; }
+
+
+
+&#x20; /\* ================= WRITE LEDGER ================= \*/
 
 
 
@@ -532,19 +534,19 @@ function processRawInputV2() {
 
 
 
-&#x20;   const startRowLedger = ledgerSheet.getLastRow() + 1;
+&#x20;   const startRow = ledger.getLastRow()+1;
 
 
 
-&#x20;   ledgerSheet
+&#x20;   ledger
 
-&#x20;     .getRange(startRowLedger,1,ledgerBuffer.length,ledgerBuffer\[0].length)
+&#x20;     .getRange(startRow,1,ledgerBuffer.length,ledgerBuffer\[0].length)
 
 &#x20;     .setValues(ledgerBuffer);
 
 
 
-&#x20;   logEvent("INPUT\_WRITTEN","RAW\_DATA",startRowLedger,ledgerBuffer.length + " eventi scritti");
+&#x20;   logEvent("INPUT\_WRITTEN","RAW\_DATA",startRow,ledgerBuffer.length + " eventi scritti");
 
 &#x20; }
 
@@ -554,43 +556,69 @@ function processRawInputV2() {
 
 
 
-&#x20; if (statusUpdates.length > 0) {
+&#x20; const statusCol = headerIndex\["Status"] + 1;
+
+&#x20; const timestampCol = 1;
 
 
 
-&#x20;   const statusCol = headerIndex\["Status"] + 1;
+&#x20; const statusRange = input.getRange(2, statusCol, data.length, 1).getValues();
+
+&#x20; const timeRange = input.getRange(2, timestampCol, data.length, 1).getValues();
 
 
 
-&#x20;   const statusRange = inputSheet
+&#x20; statusUpdates.forEach(s => {
 
-&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
+&#x20;   const index = s\[0] - 2;
 
-&#x20;     .getValues();
+&#x20;   statusRange\[index]\[0] = s\[1];
 
+&#x20;   timeRange\[index]\[0] = new Date();
 
-
-&#x20;   statusUpdates.forEach(function(update){
-
-&#x20;     const rowIndex = update\[0] - startRow;
-
-&#x20;     statusRange\[rowIndex]\[0] = update\[1];
-
-&#x20;   });
+&#x20; });
 
 
 
-&#x20;   inputSheet
+&#x20; input.getRange(2, statusCol, data.length, 1).setValues(statusRange);
 
-&#x20;     .getRange(startRow, statusCol, inputData.length, 1)
-
-&#x20;     .setValues(statusRange);
-
-&#x20; }
+&#x20; input.getRange(2, timestampCol, data.length, 1).setValues(timeRange);
 
 
 
-&#x20; logEvent("INPUT\_BATCH\_COMPLETED","RAW\_INPUT",0,processedCount + " eventi processati");
+&#x20; logEvent("INPUT\_BATCH\_COMPLETED","RAW\_INPUT",0,processed + " eventi processati");
+
+}
+
+
+
+
+
+/\* ================= ID ================= \*/
+
+
+
+function LOGOS\_generateMovementID() {
+
+
+
+&#x20; const props = PropertiesService.getDocumentProperties();
+
+
+
+&#x20; let last = parseInt(props.getProperty("LAST\_MOV\_NUMBER")) || 0;
+
+
+
+&#x20; last++;
+
+
+
+&#x20; props.setProperty("LAST\_MOV\_NUMBER", last);
+
+
+
+&#x20; return "MOV\_" + String(last).padStart(6,"0");
 
 }
 
