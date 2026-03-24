@@ -54,10 +54,11 @@ REGOLE
 → registrare velocemente  
 → NON perdere informazioni 
 
-7. L’evento è immutabile dopo la registrazione
+7. Le modifiche agli eventi sono sempre registrate come nuovi eventi
 
-→ non è consentita modifica diretta
-→ ogni modifica avviene tramite nuovo evento 
+→ il sistema non sovrascrive eventi esistenti  
+→ ogni correzione genera un nuovo evento  
+→ la vista utente mostra lo stato aggiornato   
 
 ------------------------------------------------
 SEZIONE 2 — EVENT STRUCTURE
