@@ -1,5 +1,3 @@
-#DOC.LOGOS_INPUT_EXECUTION_v1.0
-
 # LOGOS INPUT EXECUTION — MINIMAL v1.0
 
 ## 1 — FORMATO INPUT REALE
@@ -31,10 +29,18 @@ VALUES (
   json_parziale,
   'NEW'
 );
+
+Se payload non viene costruito:
+→ usare '{}'::jsonb come default
+
 3 — CAMPI MINIMI UTILIZZATI
 OBBLIGATORI (operativamente)
 raw_input
 payload
+
+raw_input è SEMPRE obbligatorio.
+Rappresenta la fonte primaria dell’evento.
+
 OPZIONALI (solo se evidenti)
 amount
 unit
@@ -56,6 +62,12 @@ Struttura standard:
   "raw": "testo originale",
   "tokens": ["parole", "chiave"]
 }
+
+Il payload può essere anche vuoto.
+
+Esempio valido:
+
+{}
 5 — FLUSSO OPERATIVO
 scrivi input
 ↓
