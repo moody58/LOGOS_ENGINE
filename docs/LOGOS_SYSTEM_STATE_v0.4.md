@@ -80,7 +80,11 @@ ogni evento è indipendente
 può essere incompleto (NULL ammessi)
 non esistono vincoli di validazione
 non esiste aggiornamento obbligatorio
-append-only (no cancellazione logica gestita qui)
+append-only (no DELETE)
+UPDATE consentiti per arricchimento e classificazione
+I campi possono essere NULL.
+La completezza è progressiva.
+
 3.2 — TABELLA PROJECTS
 projects (
   id UUID PRIMARY KEY,
@@ -165,8 +169,11 @@ LOGICA SYSTEM_LOGS
 append-only
 logging manuale
 non vincolante
-non influenza il sistema
+non influenza il comportamento del sistema
+non è fonte di verità
+la fonte di verità è sempre events
 serve per osservazione e analisi
+
 4 — ACTION MODEL v1.1
 
 Operazioni indipendenti sugli eventi:
@@ -176,9 +183,11 @@ CONTESTUALIZZARE → UPDATE project_id / entity_id
 ARRICCHIRE → UPDATE campi
 ETICHETTARE WRITTEN → status = WRITTEN
 ETICHETTARE ERROR → status = ERROR
+
 5 — MODELLO OPERATIVO
 EVENTO
   ↳ operazioni indipendenti nel tempo
+
 6 — STATUS (RIDEFINIZIONE)
 
 status NON è stato di processo.
@@ -188,6 +197,10 @@ status NON è stato di processo.
 NEW → non interpretato
 WRITTEN → valido
 ERROR → problematico
+
+Lo status NON determina comportamento del sistema.
+È solo interpretazione dell'evento.
+
 7 — LOGGING MODEL
 
 Il logging rappresenta:
