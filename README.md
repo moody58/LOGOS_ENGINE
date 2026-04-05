@@ -304,6 +304,19 @@ If you find this interesting or plan to build upon it, feel free to reach out �
 
 ---
 
+## AIOS Ecosystem
+
+LOGOS_ENGINE is part of the AIOS system as a legacy implementation.
+
+Related components:
+
+- **AIOS_CORE** — defines the system methodology  
+- **LOGOS** — current generation data engine  
+
+This repository represents an earlier stage in the system evolution.
+
+---
+
 ## Final Note
 
 This project is part of the AIOS ecosystem.
