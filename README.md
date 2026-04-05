@@ -310,8 +310,8 @@ LOGOS_ENGINE is part of the AIOS system as a legacy implementation.
 
 Related components:
 
-- **AIOS_CORE** — defines the system methodology  
-- **LOGOS** — current generation data engine  
+- **AIOS_CORE** [https://github.com/moody58/aios_core] — defines the system methodology  
+- **LOGOS** [https://github.com/moody58/logos] — current generation data engine  
 
 This repository represents an earlier stage in the system evolution.
 
