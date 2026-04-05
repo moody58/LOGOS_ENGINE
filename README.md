@@ -296,14 +296,11 @@ It remains useful for:
 
 ## 9. Open Collaboration
 
-This project is shared for:
+This project is part of a broader experimental system (AIOS).
 
-* studying the Event Ledger model
-* architectural analysis
-* discussion on event-driven systems
-* understanding system evolution
+It is shared openly to explore ideas, structures, and workflows.
 
-It is not intended as a final product, but as a historical and technical foundation of LOGOS.
+If you find this interesting or plan to build upon it, feel free to reach out — I’d be glad to connect.
 
 ---
 
